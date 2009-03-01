@@ -115,13 +115,19 @@ data ARMConditionalOpcode = O_B Bool Int32 -- B, BL
                           | O_RSB Bool ARMRegister ARMRegister ARMOpData -- RSB, RSBS
                           | O_ADD Bool ARMRegister ARMRegister ARMOpData -- ADD, ADDS
                           | O_ADC Bool ARMRegister ARMRegister ARMOpData -- ADC, ADCS
+                          | O_SBC Bool ARMRegister ARMRegister ARMOpData -- SBC, SBCS
                           | O_RSC Bool ARMRegister ARMRegister ARMOpData -- RSC, RSCS
-                          | O_TST Bool ARMRegister ARMRegister ARMOpData -- TST, TSTS
-                          | O_TEQ Bool ARMRegister ARMRegister ARMOpData -- TEQ, TEQS
-                          | O_CMP Bool ARMRegister ARMRegister ARMOpData -- CMP, CMPS
-                          | O_CMN Bool ARMRegister ARMRegister ARMOpData -- CMN, CMNS
+                          | O_TST ARMRegister ARMOpData -- TST
+                          | O_TEQ ARMRegister ARMOpData -- TEQ
+                          | O_CMP ARMRegister ARMOpData -- CMP
+                          | O_CMN ARMRegister ARMOpData -- CMN
                           | O_ORR Bool ARMRegister ARMRegister ARMOpData -- ORR, ORRS
                           | O_MOV Bool ARMRegister ARMOpData -- MOV, MOVS
+                          | O_LSL Bool ARMRegister ARMOpData
+                          | O_LSR Bool ARMRegister ARMOpData
+                          | O_ASR Bool ARMRegister ARMOpData
+                          | O_RRX Bool ARMRegister ARMRegister 
+                          | O_ROR Bool ARMRegister ARMOpData
                           | O_BIC Bool ARMRegister ARMRegister ARMOpData -- BIC, BICS
                           | O_MVN Bool ARMRegister ARMOpData -- MVN, MVNS
                                                     
@@ -234,6 +240,24 @@ data ARMConditionalOpcode = O_B Bool Int32 -- B, BL
                           | O_SWP Bool ARMRegister ARMRegister ARMRegister -- SWP, SWPB
                           
                           | O_SWI Word32
+                          
+                          | O_DBG Word32
+                          | O_DMB ARMHint
+                          | O_DSB ARMHint
+                          | O_ISB ARMHint
+                          
+                          | O_YIELD
+                          | O_WFE
+                          | O_WFI
+                          | O_SEV
+                          
+                          | O_BFC ARMRegister (Maybe (Word32, Word32))
+                          | O_BFI ARMRegister ARMRegister (Maybe (Word32, Word32)) -- come up with a nicer way to do this
+                          | O_MLS ARMRegister ARMRegister ARMRegister
+                          
+                          | O_MOVW ARMRegister Word32
+                          | O_MOVT ARMRegister Word32
+                          | O_RBIT ARMRegister ARMRegister
   deriving (Show, Read, Eq)
 
 data ARMUnconditionalOpcode = O_CPS
@@ -273,6 +297,12 @@ data ARMInstruction = ARMUnconditionalInstruction ARMUnconditionalOpcode
                     | ARMConditionalInstruction ARMCondition ARMConditionalOpcode
   deriving (Show, Read, Eq)
   
+data ARMHint = SY 
+             | UN 
+             | ST 
+             | UNST 
+             | UK Word32
+  deriving (Show, Read, Eq)
 {-            
 data ARMInstruction = ARMInstruction { insn_opcode :: ARMOpcode
                                      , insn_condition :: ARMCondition
@@ -366,17 +396,17 @@ arm_o :: ARMDecoder ARMOpData
 arm_o (_, i) | i .&. 0x2000000 /= 0 = OP_Imm . fromIntegral $ (i .&. 0xff) `rotateR` (((fromIntegral i) .&. 0xf00) `shiftR` 7)
              | otherwise = armDecodeShift i True
 
-arm_p :: ARMDecoder String
-arm_p (s, i) = if (i .&. 0xf000) == 0xf000 then "p" else "" 
+arm_p :: ARMDecoder Bool
+arm_p (s, i) = i .&. 0xf000 == 0xf000
 
-arm_t :: ARMDecoder String
-arm_t (s, i) = if (i .&. 0x1200000) == 0x200000 then "t" else ""
+arm_t :: ARMDecoder Bool
+arm_t (s, i) = i .&. 0x1200000 == 0x200000
 
 arm_q :: ARMDecoder ARMOpData
 arm_q (s, i) = armDecodeShift i False
 
-arm_e :: ARMDecoder String
-arm_e (s, i) = show $ (i .&. 0xf) .|. ((i .&. 0xfff00) `shiftR` 4)
+arm_e :: ARMDecoder Word32
+arm_e (s, i) = (i .&. 0xf) .|. ((i .&. 0xfff00) `shiftR` 4)
 
 arm_B :: ARMDecoder Int32
 arm_B (s, i) = let offset = ((if i .&. 0x800000 /= 0 then 0xff else 0) + (i .&. 0xffffff)) `shiftL` 2 
@@ -390,13 +420,13 @@ arm_C (s, i) = '_' : (if i .&. 0x80000 /= 0 then "f" else "" ++
                    if i .&. 0x20000 /= 0 then "x" else "" ++
                    if i .&. 0x10000 /= 0 then "c" else "")
 
-arm_U :: ARMDecoder String
+arm_U :: ARMDecoder ARMHint
 arm_U (s, i) = case i .&. 0xf of
-              0xf -> "sy"
-              0x7 -> "un"
-              0xe -> "st"
-              0x6 -> "unst"
-              x   -> show x
+                 0xf -> SY
+                 0x7 -> UN
+                 0xe -> ST
+                 0x6 -> UNST
+                 x   -> UK x
 
 --arm_P :: ARMDecoder String
 --arm_P (s, i) = printARMAddress (s, (i .|. (1 `shiftL` 24)))
@@ -404,31 +434,31 @@ arm_U (s, i) = case i .&. 0xf of
 arm_r :: Int -> Int -> ARMDecoder ARMRegister
 arm_r start end (_, i) = toEnum (bitRange start end $ fromIntegral i)
 
-arm_d :: Int -> Int -> ARMDecoder Int
+arm_d :: (Integral a, Bits a) => Int -> Int -> ARMDecoder a
 arm_d start end (_, i) = bitRange start end $ fromIntegral i
 
 arm_W :: (Integral a, Bits a) => Int -> Int -> ARMDecoder a
 arm_W start end (_, i) = (+1) . bitRange start end $ fromIntegral i
 
-arm_x :: Int -> Int -> ARMDecoder Int
+arm_x :: (Integral a, Bits a) => Int -> Int -> ARMDecoder a
 arm_x = arm_d
 
 arm_X :: Int -> Int -> ARMDecoder Word32
 arm_X start end (s, i) = (.&. 0xf) . bitRange start end $ i
 
-arm_arr :: Int -> Int -> [Char] -> ARMDecoder String
-arm_arr start end c (s, i) = return $ c !! (bitRange start end $ fromIntegral i)
+arm_arr :: Int -> Int -> [a] -> ARMDecoder a
+arm_arr start end c (_, i) = c !! (fromIntegral $ bitRange start end i)
 
-arm_E :: ARMDecoder String
-arm_E (s, i) = let msb = (i .&. 0x1f0000) `shiftR` 16
+arm_E :: ARMDecoder (Maybe (Word32, Word32))
+arm_E (_, i) = let msb = (i .&. 0x1f0000) `shiftR` 16
                    lsb = (i .&. 0xf80) `shiftR` 7
                    width = msb - lsb + 1 in
                  if width > 0 then
-                   "#" ++ (show lsb) ++ ", #" ++ (show width)
-                   else "(invalid " ++ (show lsb) ++ ":" ++ (show msb) ++ ")"            
+                   Just (lsb, width) --"#" ++ (show lsb) ++ ", #" ++ (show width)
+                   else Nothing --"(invalid " ++ (show lsb) ++ ":" ++ (show msb) ++ ")"            
 
-arm_V :: ARMDecoder String
-arm_V (s, i) = "#" ++ (show $ (i .&. 0xf0000) `shiftR` 4 .|. (i .&. 0xfff))
+arm_V :: ARMDecoder Word32
+arm_V (_, i) = (i .&. 0xf0000) `shiftR` 4 .|. (i .&. 0xfff)
 
 {-
 arm_square :: ARMDecoder -> ARMDecoder
@@ -463,19 +493,19 @@ armOpcodes =
   --, ARMOpcode32 [ARM_EXT_V2S] 0x01000090 0x0fb00ff0 [arm_const "swp", arm_char1 22 22 'b', arm_c, arm_r 12 15, arm_r 0 3, arm_square (arm_r 16 19)]
   --, ARMOpcode32 [ARM_EXT_V3M] 0x00800090 0x0fa000f0 [arm_arr 22 22 ['s', 'u'], arm_const "mull", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_r 16 19, arm_r 0 3, arm_r 8 11]
   --, ARMOpcode32 [ARM_EXT_V3M] 0x00800090 0x0fa000f0 [arm_arr 22 22 ['s', 'u'], arm_const "mlal", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_r 16 19, arm_r 0 3, arm_r 8 11]
-  --, ARMOpcode32 [ARM_EXT_V7] 0xf450f000 0xfd70f000 [arm_const "pli", arm_P]
-  --, ARMOpcode32 [ARM_EXT_V7] 0x0320f0f0 0x0ffffff0 [arm_const "dbg", arm_c, arm_d 0 3]
-  --, ARMOpcode32 [ARM_EXT_V7] 0xf57ff050 0x0ffffff0 [arm_const "dmb", arm_U]
-  --, ARMOpcode32 [ARM_EXT_V7] 0xf57ff040 0x0ffffff0 [arm_const "dsb", arm_U]
-  --, ARMOpcode32 [ARM_EXT_V7] 0xf57ff060 0x0ffffff0 [arm_const "isb", arm_U]
-  --, ARMOpcode32 [ARM_EXT_V6T2] 0x07c0001f 0x0fe0007f [arm_const "bfc", arm_c, arm_r 12 15, arm_E] 
-  --, ARMOpcode32 [ARM_EXT_V6T2] 0x07c00010 0x0fe00070 [arm_const "bfi", arm_c, arm_r 12 15, arm_r 0 3, arm_E]
-  --, ARMOpcode32 [ARM_EXT_V6T2] 0x00600090 0x0ff000f0 [arm_const "mls", arm_c, arm_r 0 3, arm_r 8 11, arm_r 12 15]
+  --,ARMOpcode32 [ARM_EXT_V7] 0xf450f000 0xfd70f000 (arm_cond $ liftM O_PLI arm_P)
+  ,ARMOpcode32 [ARM_EXT_V7] 0x0320f0f0 0x0ffffff0 (arm_cond $ liftM O_DBG (arm_d 0 3))
+  ,ARMOpcode32 [ARM_EXT_V7] 0xf57ff050 0x0ffffff0 (arm_cond $ liftM O_DMB arm_U)
+  ,ARMOpcode32 [ARM_EXT_V7] 0xf57ff040 0x0ffffff0 (arm_cond $ liftM O_DSB arm_U)
+  ,ARMOpcode32 [ARM_EXT_V7] 0xf57ff060 0x0ffffff0 (arm_cond $ liftM O_ISB arm_U)
+  ,ARMOpcode32 [ARM_EXT_V6T2] 0x07c0001f 0x0fe0007f (arm_cond $ liftM2 O_BFC (arm_r 12 15) arm_E)
+  ,ARMOpcode32 [ARM_EXT_V6T2] 0x07c00010 0x0fe00070 (arm_cond $ liftM3 O_BFI (arm_r 12 15) (arm_r 0 3) arm_E)
+  ,ARMOpcode32 [ARM_EXT_V6T2] 0x00600090 0x0ff000f0 (arm_cond $ liftM3 O_MLS (arm_r 0 3) (arm_r 8 11) (arm_r 12 15))
   --, ARMOpcode32 [ARM_EXT_V6T2] 0x006000b0 0x0f7000f0 [arm_const "strht", arm_c, arm_r 12 15, arm_s]
   --, ARMOpcode32 [ARM_EXT_V6T2] 0x00300090 0x0f300090 [arm_const "ldr", arm_char1 6 6 's', arm_arr 5 5 ['h','b'], arm_c, arm_r 12 15, arm_s]
-  --, ARMOpcode32 [ARM_EXT_V6T2] 0x03000000 0x0ff00000 [arm_const "movw", arm_c, arm_r 12 15, arm_V]
-  --, ARMOpcode32 [ARM_EXT_V6T2] 0x03400000 0x0ff00000 [arm_const "movt", arm_c, arm_r 12 15, arm_V]
-  --, ARMOpcode32 [ARM_EXT_V6T2] 0x06ff0f30 0x0fff0ff0 [arm_const "rbit", arm_c, arm_r 12 15, arm_r 0 3]
+  , ARMOpcode32 [ARM_EXT_V6T2] 0x03000000 0x0ff00000 (arm_cond $ liftM2 O_MOVW (arm_r 12 15) arm_V)
+  , ARMOpcode32 [ARM_EXT_V6T2] 0x03400000 0x0ff00000 (arm_cond $ liftM2 O_MOVT (arm_r 12 15) arm_V)
+  , ARMOpcode32 [ARM_EXT_V6T2] 0x06ff0f30 0x0fff0ff0 (arm_cond $ liftM2 O_RBIT (arm_r 12 15) (arm_r 0 3))
   --, ARMOpcode32 [ARM_EXT_V6T2] 0x07a00050 0x0fa00070 [arm_arr 22 22 ['u', 's'], arm_const "bfx", arm_c, arm_r 12 15, arm_r 0 3, arm_d 7 11, arm_W 16 20]
   --, ARMOpcode32 [ARM_EXT_V6Z] 0x01600070 0x0ff000f0 [arm_const "smc", arm_c, arm_e]
   --, ARMOpcode32 [ARM_EXT_V6K] 0xf57ff01f 0xffffffff [arm_const "clrex"]
@@ -485,10 +515,10 @@ armOpcodes =
   --, ARMOpcode32 [ARM_EXT_V6K] 0x01c00f90 0x0ff00ff0 [arm_const "strexb", arm_c, arm_r 12 15, arm_r 0 3, arm_square (arm_r 16 19)]
   --, ARMOpcode32 [ARM_EXT_V6K] 0x01a00f90 0x0ff00ff0 [arm_const "strexd", arm_c, arm_r 12 15, arm_r 0 3, arm_square (arm_r 16 19)] 
   --, ARMOpcode32 [ARM_EXT_V6K] 0x01e00f90 0x0ff00ff0 [arm_const "strexh", arm_c, arm_r 12 15, arm_r 0 3, arm_square (arm_r 16 19)] 
-  --, ARMOpcode32 [ARM_EXT_V6K] 0x0320f001 0x0fffffff [arm_const "yield", arm_c]
-  --, ARMOpcode32 [ARM_EXT_V6K] 0x0320f002 0x0fffffff [arm_const "wfe", arm_c] 
-  --, ARMOpcode32 [ARM_EXT_V6K] 0x0320f003 0x0fffffff [arm_const "wfi", arm_c]
-  --, ARMOpcode32 [ARM_EXT_V6K] 0x0320f004 0x0fffffff [arm_const "sev", arm_c]
+  ,ARMOpcode32 [ARM_EXT_V6K] 0x0320f001 0x0fffffff (arm_cond $ const O_YIELD)
+  ,ARMOpcode32 [ARM_EXT_V6K] 0x0320f002 0x0fffffff (arm_cond $ const O_WFE)
+  ,ARMOpcode32 [ARM_EXT_V6K] 0x0320f003 0x0fffffff (arm_cond $ const O_WFI)
+  ,ARMOpcode32 [ARM_EXT_V6K] 0x0320f004 0x0fffffff (arm_cond $ const O_SEV)
   --, ARMOpcode32 [ARM_EXT_V6K] 0x0320f000 0x0fffff00 [arm_const "nop", arm_c, arm_curly (arm_d 0 7)]
   --, ARMOpcode32 [ARM_EXT_V6] 0xf1080000 0xfffffe3f [arm_const "cpsie", arm_char1 8 8 'a', arm_char1 7 7 'i', arm_char1 6 6 'f']
   --, ARMOpcode32 [ARM_EXT_V6] 0xf10a0000 0xfffffe20 [arm_const "cpsie", arm_char1 8 8 'a', arm_char1 7 7 'i', arm_char1 6 6 'f', arm_d 0 4] 
@@ -613,10 +643,10 @@ armOpcodes =
   ,ARMOpcode32 [ARM_EXT_V6] 0x06e00050 0x0fe00070 (arm_cond $ liftM3 O_USAT    (arm_r 12 15) (arm_W 16 20) (liftM2 (OP_RegShiftImm S_ASR) (arm_d 7 11) (arm_r 0 3)))
   ,ARMOpcode32 [ARM_EXT_V6] 0x06e00f30 0x0ff00ff0 (arm_cond $ liftM3 O_USAT16  (arm_r 12 15) (arm_W 16 19) (arm_r 0 3))
   ,ARMOpcode32 [ARM_EXT_V5J] 0x012fff20 0x0ffffff0 (arm_cond $ liftM O_BXJ     (arm_r 0 3))
-  --,ARMOpcode32 [ARM_EXT_V5] 0xe1200070 0xfff000f0 (arm_uncond $ liftM O_BKPT (\x -> ((`shiftL` 24) . fromIntegral . arm_X 16 19 x) .|. ((`shiftL` 16) . fromIntegral . arm_X 12 15 x) .|. ((`shiftL` 8) . fromIntegral . arm_X 8 11 x) .|. ((fromIntegral . arm_X 0 3) x))) -- compound number
-  ,ARMOpcode32 [ARM_EXT_V5] 0xfa000000 0xfe000000 (arm_uncond $ liftM O_BLXUC arm_B) --, ARMOpcode32 [ARM_EXT_V5] 0xfa000000 0xfe000000 [arm_const "blx", arm_B]
-  ,ARMOpcode32 [ARM_EXT_V5] 0x012fff30 0x0ffffff0 (arm_cond $ liftM O_BLX (arm_r 0 3)) --, ARMOpcode32 [ARM_EXT_V5] 0x012fff30 0x0ffffff0 [arm_const "blx", arm_c, arm_r 0 3]
-  ,ARMOpcode32 [ARM_EXT_V5] 0x016f0f10 0x0fff0ff0 (arm_cond $ liftM2 O_CLZ (arm_r 12 15) (arm_r 0 3)) --, ARMOpcode32 [ARM_EXT_V5] 0x016f0f10 0x0fff0ff0 [arm_const "clz", arm_c, arm_r 12 15, arm_r 0 3]
+  ,ARMOpcode32 [ARM_EXT_V5] 0xe1200070 0xfff000f0 (arm_uncond $ liftM O_BKPT (liftM2 (\x y -> x `shiftL` 4 .|. y) (arm_d 8 19) (arm_d 0 3))) 
+  ,ARMOpcode32 [ARM_EXT_V5] 0xfa000000 0xfe000000 (arm_uncond $ liftM O_BLXUC arm_B)
+  ,ARMOpcode32 [ARM_EXT_V5] 0x012fff30 0x0ffffff0 (arm_cond $ liftM O_BLX (arm_r 0 3))
+  ,ARMOpcode32 [ARM_EXT_V5] 0x016f0f10 0x0fff0ff0 (arm_cond $ liftM2 O_CLZ (arm_r 12 15) (arm_r 0 3))
   --, ARMOpcode32 [ARM_EXT_V5E] 0x000000d0 0x0e1000f0 [arm_const "ldrd", arm_c, arm_r 12 15, arm_s]
   --, ARMOpcode32 [ARM_EXT_V5E] 0x000000f0 0x0e1000f0 [arm_const "strd", arm_c, arm_r 12 15, arm_s]
   --, ARMOpcode32 [ARM_EXT_V5E] 0xf450f000 0xfc70f000 [arm_const "pld", arm_a]
@@ -646,24 +676,26 @@ armOpcodes =
   ,ARMOpcode32 [ARM_EXT_V1] 0x00600000 0x0de00000 (arm_cond $ liftM4 O_RSB (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
   ,ARMOpcode32 [ARM_EXT_V1] 0x00800000 0x0de00000 (arm_cond $ liftM4 O_ADD (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
   ,ARMOpcode32 [ARM_EXT_V1] 0x00a00000 0x0de00000 (arm_cond $ liftM4 O_ADC (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
-  --,ARMOpcode32 [ARM_EXT_V1] 0x00c00000 0x0de00000 (arm_cond $ liftM4 O_SBC (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x00c00000 0x0de00000 (arm_cond $ liftM4 O_SBC (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
   ,ARMOpcode32 [ARM_EXT_V1] 0x00e00000 0x0de00000 (arm_cond $ liftM4 O_RSC (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
   --, ARMOpcode32 [ARM_EXT_V3] 0x0120f000 0x0db0f000 [arm_const "msr", arm_c, arm_arr 22 22 ['S', 'C'], arm_const "PSR", arm_C, arm_o]
   --, ARMOpcode32 [ARM_EXT_V3] 0x010f0000 0x0fbf0fff [arm_const "mrs", arm_c, arm_r 12 15, arm_arr 22 22 ['S', 'C'], arm_const "PSR"]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x01000000 0x0de00000 [arm_const "tst", arm_p, arm_c, arm_r 16 19, arm_o]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x01200000 0x0de00000 [arm_const "teq", arm_p, arm_c, arm_r 16 19, arm_o]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x01400000 0x0de00000 [arm_const "cmp", arm_p, arm_c, arm_r 16 19, arm_o]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x01600000 0x0de00000 [arm_const "cmn", arm_p, arm_c, arm_r 16 19, arm_o]
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01000000 0x0de00000 (arm_cond $ liftM2 O_TST {-arm_p-} (arm_r 16 19) arm_o)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01200000 0x0de00000 (arm_cond $ liftM2 O_TEQ {-arm_p-} (arm_r 16 19) arm_o)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01400000 0x0de00000 (arm_cond $ liftM2 O_CMP {-arm_p-} (arm_r 16 19) arm_o)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01600000 0x0de00000 (arm_cond $ liftM2 O_CMN {-arm_p-} (arm_r 16 19) arm_o)
   ,ARMOpcode32 [ARM_EXT_V1] 0x01800000 0x0de00000 (arm_cond $ liftM4 O_ORR (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
-  ,ARMOpcode32 [ARM_EXT_V1] 0x03a00000 0x0fef0000 (arm_cond $ liftM3 O_MOV (arm_bool 20) (arm_r 12 15) arm_o)--, ARMOpcode32 [ARM_EXT_V1] 0x03a00000 0x0fef0000 [arm_const "mov", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_o]
-  --,ARMOpcode32 [ARM_EXT_V1] 0x01a00000 0x0def0ff0 (arm_cond $ liftM3 O_MOV (arm_bool 20) (arm_r 12 15) (arm_r 0 3)) --, ARMOpcode32 [ARM_EXT_V1] 0x01a00000 0x0def0ff0 [arm_const "mov", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_r 0 3]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x01a00000 0x0def0060 [arm_const "lsl", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_q]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x01a00020 0x0def0060 [arm_const "lsr", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_q]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x01a00040 0x0def0060 [arm_const "asr", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_q]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x01a00060 0x0def0ff0 [arm_const "rrx", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_r 0 3]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x01a00060 0x0def0060 [arm_const "ror", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_q]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x01c00000 0x0de00000 [arm_const "bic", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_r 16 19, arm_o]
-  ,ARMOpcode32 [ARM_EXT_V1] 0x01e00000 0x0de00000 (arm_cond $ liftM3 O_MVN (arm_bool 20) (arm_r 12 15) arm_o)--, ARMOpcode32 [ARM_EXT_V1] 0x01e00000 0x0de00000 [arm_const "mvn", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_o]
+
+  ,ARMOpcode32 [ARM_EXT_V1] 0x03a00000 0x0fef0000 (arm_cond $ liftM3 O_MOV (arm_bool 20) (arm_r 12 15) arm_o)
+  --,ARMOpcode32 [ARM_EXT_V1] 0x01a00000 0x0def0ff0 (arm_cond $ liftM3 O_MOV (arm_bool 20) (arm_r 12 15) (arm_r 0 3))
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01a00000 0x0def0060 (arm_cond $ liftM3 O_LSL (arm_bool 20) (arm_r 12 15) arm_q)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01a00020 0x0def0060 (arm_cond $ liftM3 O_LSR (arm_bool 20) (arm_r 12 15) arm_q)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01a00040 0x0def0060 (arm_cond $ liftM3 O_ASR (arm_bool 20) (arm_r 12 15) arm_q)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01a00060 0x0def0ff0 (arm_cond $ liftM3 O_RRX (arm_bool 20) (arm_r 12 15) (arm_r 0 3))
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01a00060 0x0def0060 (arm_cond $ liftM3 O_ROR (arm_bool 20) (arm_r 12 15) arm_q)
+  
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01c00000 0x0de00000 (arm_cond $ liftM4 O_BIC (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x01e00000 0x0de00000 (arm_cond $ liftM3 O_MVN (arm_bool 20) (arm_r 12 15) arm_o)
   --, ARMOpcode32 [ARM_EXT_V1] 0x052d0004 0x0fff0fff [arm_const "str", arm_c, arm_r 12 15, arm_a]
   --, ARMOpcode32 [ARM_EXT_V1] 0x04000000 0x0e100000 [arm_const "str", arm_char1 22 22 'b', arm_t, arm_c, arm_r 12 15, arm_a]
   --, ARMOpcode32 [ARM_EXT_V1] 0x06000000 0x0e100ff0 [arm_const "str", arm_char1 22 22 'b', arm_t, arm_c, arm_r 12 15, arm_a]
