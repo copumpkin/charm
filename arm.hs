@@ -227,11 +227,9 @@ data ARMConditionalOpcode = O_B Bool Int32 -- B, BL
                           | O_MRS ARMRegister ARMStatusRegister
                           | O_MSR 
                           
-                          | O_LDR Width ARMRegister ARMOpMemory -- LDR, LDRB, LDRH, LDRD
-                          | O_STR Width ARMRegister ARMOpMemory -- STR, STRB, STRH, STRD
+                          | O_LDR Width Bool ARMRegister ARMOpMemory -- LDR, LDRB, LDRH, LDRD, LDRT LDRBT -- TODO: some of these combinations are invalid, should we stop that?
+                          | O_STR Width Bool ARMRegister ARMOpMemory -- STR, STRB, STRH, STRD, STRT, STRBT
                           | O_LDRS Bool ARMRegister ARMOpMemory -- LDRSB, LDRSH
-                          | O_LDRT Bool ARMRegister ARMOpMemory -- LDRT LDRBT
-                          | O_STRT Bool ARMRegister ARMOpMemory -- STRT, STRBT
                           | O_LDREX
                           | O_STREX
                           
@@ -246,6 +244,8 @@ data ARMConditionalOpcode = O_B Bool Int32 -- B, BL
                           | O_DMB ARMHint
                           | O_DSB ARMHint
                           | O_ISB ARMHint
+                          
+                          | O_PLI ARMOpMemory
                           
                           | O_YIELD
                           | O_WFE
@@ -265,7 +265,7 @@ data ARMUnconditionalOpcode = O_CPS
                             | O_SETEND ARMEndian
                             | O_RFE
                             | O_BKPT Word8
-                            | O_PLD
+                            | O_PLD ARMOpMemory
                             | O_SRS
                             | O_BLXUC Int32 -- unconditional BLX
   deriving (Show, Read, Eq)
@@ -324,29 +324,26 @@ armShift = ["lsl", "lsr", "asr", "ror"]
 
 type ARMDecoder a = (ARMState, Word32) -> a
 
-{-
-printARMAddress :: ARMDecoder String
-printARMAddress (s, a) | (a .&. 0xf0000) == 0xf0000 && (a .&. 0x2000000) == 0 = 
+
+armDecodeAddress :: ARMDecoder ARMOpMemory
+armDecodeAddress (s, a) | (a .&. 0xf0000) == 0xf0000 && (a .&. 0x2000000) == 0 = 
                         let offset = a .&. 0xfff in
                           case a .&. 0x1000000 /= 0 of
-                            True -> "[pc, #" ++ (show $ if (a .&. 0x800000) == 0 then -offset else offset) ++ (if (a .&. 0x200000) /= 0 then "]!" else "]")
-                            _    -> "[pc], " ++ (show offset)
-                    | otherwise = 
-                          "[" ++ (armRegisters !! (((fromIntegral a) `shiftR` 16 ) .&. 0xf)) ++ case a .&. 0x1000000 /= 0 of
-                            False -> if (a .&. 0x2000000) == 0 then
-                                       let offset = a .&. 0xfff in
-                                         if offset /= 0 then
-                                           "], #" ++ if (a .&. 0x800000) == 0 then show (-(fromIntegral offset :: Int32)) else show offset
-                                           else "]"
-                                       else "], #" ++ (if (a .&. 0x800000) == 0 then "-" else "") ++ (armDecodeShift a False)
-                            _     -> if (a .&. 0x2000000) == 0 then
-                                       let offset = a .&. 0xfff in
-                                         (if offset /= 0 then
-                                            ", #" ++ if (a .&. 0x800000) == 0 then show (-(fromIntegral offset :: Int32)) else show offset
-                                            else "") ++ if (a .&. 0x200000) /= 0 then "]!" else "]"
-                                       else ", #" ++ (if (a .&. 0x800000) == 0 then "-" else "") ++ (armDecodeShift a False)
-                                          ++ if (a .&. 0x200000) /= 0 then "]!" else "]"
--}
+                            True -> OP_MemRegImm PC (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset) ((a .&. 0x200000) /= 0)
+                            _    -> OP_MemRegPostImm PC (fromIntegral offset)
+                        | otherwise = 
+                              let baseReg = (toEnum (((fromIntegral a) `shiftR` 16 ) .&. 0xf)) in case a .&. 0x1000000 /= 0 of
+                                False -> if (a .&. 0x2000000) == 0 then
+                                           let offset = a .&. 0xfff in
+                                             if offset /= 0 then
+                                               OP_MemRegPostImm baseReg (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset)
+                                               else OP_MemRegPostImm baseReg 0
+                                           else undefined -- OP_MemRegPostShiftReg baseReg -- (if (a .&. 0x800000) == 0 then "-" else "") ++ (armDecodeShift a False)
+                                _     -> if (a .&. 0x2000000) == 0 then
+                                           let offset = a .&. 0xfff in
+                                             OP_MemRegImm baseReg (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset) ((a .&. 0x200000) /= 0)
+                                           else undefined -- ", #" ++ (if (a .&. 0x800000) == 0 then "-" else "") ++ (armDecodeShift a False) ++ if (a .&. 0x200000) /= 0 then "]!" else "]"
+
 
 armDecodeShift :: Word32 -> Bool -> ARMOpData
 armDecodeShift i p =  if i .&. 0xff0 /= 0 then
@@ -364,8 +361,8 @@ arm_const x (s, i) = x
 arm_constint :: Int -> ARMDecoder String
 arm_constint x (s, i) = show x
 
---arm_a :: ARMDecoder String
---arm_a = printARMAddress 
+arm_a :: ARMDecoder ARMOpMemory
+arm_a = armDecodeAddress 
 
 -- FIXME: wow, this is pretty ugly...
 arm_s :: ARMDecoder String
@@ -429,8 +426,8 @@ arm_U (s, i) = case i .&. 0xf of
                  0x6 -> UNST
                  x   -> UK x
 
---arm_P :: ARMDecoder String
---arm_P (s, i) = printARMAddress (s, (i .|. (1 `shiftL` 24)))
+arm_P :: ARMDecoder ARMOpMemory
+arm_P (s, i) = armDecodeAddress (s, (i .|. (1 `shiftL` 24)))
 
 arm_r :: Int -> Int -> ARMDecoder ARMRegister
 arm_r start end (_, i) = toEnum (bitRange start end $ fromIntegral i)
@@ -486,6 +483,8 @@ arm_uncond = liftM ARMUnconditionalInstruction
 
 arm_cond = liftM2 ARMConditionalInstruction arm_c
 
+arm_bw bit (_, i) = if bitRange bit bit i == 1 then Byte else Word
+
 armOpcodes = 
   [--ARMOpcode32 [ARM_EXT_V1] 0xe1a00000 0xffffffff [arm_const "nop"]
    ARMOpcode32 [ARM_EXT_V4T, ARM_EXT_V5] 0x012FFF10 0x0ffffff0 (arm_cond $ liftM O_BX (arm_r 0 3))
@@ -494,7 +493,7 @@ armOpcodes =
   --, ARMOpcode32 [ARM_EXT_V2S] 0x01000090 0x0fb00ff0 [arm_const "swp", arm_char1 22 22 'b', arm_c, arm_r 12 15, arm_r 0 3, arm_square (arm_r 16 19)]
   ,ARMOpcode32 [ARM_EXT_V3M] 0x00800090 0x0fa000f0 (arm_cond $ (arm_arr 22 22 [O_SMULL, O_UMULL]) `ap` (arm_bool 20) `ap` (arm_r 12 15) `ap` (arm_r 16 19) `ap` (arm_r 0 3) `ap` (arm_r 8 11))
   --,ARMOpcode32 [ARM_EXT_V3M] 0x00800090 0x0fa000f0 (arm_cond $ (arm_arr 22 22 [O_SMLAL, O_UMLAL]) `ap` (arm_bool 20) `ap` (arm_r 12 15) `ap` (arm_r 16 19) `ap` (arm_r 0 3) `ap` (arm_r 8 11))
-  --,ARMOpcode32 [ARM_EXT_V7] 0xf450f000 0xfd70f000 (arm_cond $ liftM O_PLI arm_P)
+  ,ARMOpcode32 [ARM_EXT_V7] 0xf450f000 0xfd70f000 (arm_cond $ liftM O_PLI arm_P)
   ,ARMOpcode32 [ARM_EXT_V7] 0x0320f0f0 0x0ffffff0 (arm_cond $ liftM O_DBG (arm_d 0 3))
   ,ARMOpcode32 [ARM_EXT_V7] 0xf57ff050 0x0ffffff0 (arm_cond $ liftM O_DMB arm_U)
   ,ARMOpcode32 [ARM_EXT_V7] 0xf57ff040 0x0ffffff0 (arm_cond $ liftM O_DSB arm_U)
@@ -650,7 +649,7 @@ armOpcodes =
   ,ARMOpcode32 [ARM_EXT_V5] 0x016f0f10 0x0fff0ff0 (arm_cond $ liftM2 O_CLZ (arm_r 12 15) (arm_r 0 3))
   --, ARMOpcode32 [ARM_EXT_V5E] 0x000000d0 0x0e1000f0 [arm_const "ldrd", arm_c, arm_r 12 15, arm_s]
   --, ARMOpcode32 [ARM_EXT_V5E] 0x000000f0 0x0e1000f0 [arm_const "strd", arm_c, arm_r 12 15, arm_s]
-  --, ARMOpcode32 [ARM_EXT_V5E] 0xf450f000 0xfc70f000 [arm_const "pld", arm_a]
+  ,ARMOpcode32 [ARM_EXT_V5E] 0xf450f000 0xfc70f000 (arm_uncond $ liftM O_PLD arm_a)
   ,ARMOpcode32 [ARM_EXT_V5ExP] 0x01000080 0x0ff000f0 (arm_cond $ liftM4 (O_SMLA B B) (arm_r 16 19) (arm_r 0 3) (arm_r 8 11) (arm_r 12 15))
   ,ARMOpcode32 [ARM_EXT_V5ExP] 0x010000a0 0x0ff000f0 (arm_cond $ liftM4 (O_SMLA T B) (arm_r 16 19) (arm_r 0 3) (arm_r 8 11) (arm_r 12 15))
   ,ARMOpcode32 [ARM_EXT_V5ExP] 0x010000c0 0x0ff000f0 (arm_cond $ liftM4 (O_SMLA B T) (arm_r 16 19) (arm_r 0 3) (arm_r 8 11) (arm_r 12 15))
@@ -697,13 +696,13 @@ armOpcodes =
   
   ,ARMOpcode32 [ARM_EXT_V1] 0x01c00000 0x0de00000 (arm_cond $ liftM4 O_BIC (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
   ,ARMOpcode32 [ARM_EXT_V1] 0x01e00000 0x0de00000 (arm_cond $ liftM3 O_MVN (arm_bool 20) (arm_r 12 15) arm_o)
-  --, ARMOpcode32 [ARM_EXT_V1] 0x052d0004 0x0fff0fff [arm_const "str", arm_c, arm_r 12 15, arm_a]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x04000000 0x0e100000 [arm_const "str", arm_char1 22 22 'b', arm_t, arm_c, arm_r 12 15, arm_a]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x06000000 0x0e100ff0 [arm_const "str", arm_char1 22 22 'b', arm_t, arm_c, arm_r 12 15, arm_a]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x04000000 0x0c100010 [arm_const "str", arm_char1 22 22 'b', arm_t, arm_c, arm_r 12 15, arm_a]
+  ,ARMOpcode32 [ARM_EXT_V1] 0x052d0004 0x0fff0fff (arm_cond $ liftM2 (O_STR Word False) (arm_r 12 15) arm_a)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x04000000 0x0e100000 (arm_cond $ liftM4 O_STR (arm_bw 22) arm_t (arm_r 12 15) arm_a)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x06000000 0x0e100ff0 (arm_cond $ liftM4 O_STR (arm_bw 22) arm_t (arm_r 12 15) arm_a)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x04000000 0x0c100010 (arm_cond $ liftM4 O_STR (arm_bw 22) arm_t (arm_r 12 15) arm_a)
   --, ARMOpcode32 [ARM_EXT_V1] 0x06000010 0x0e000010 [arm_const "undefined"]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x049d0004 0x0fff0fff [arm_const "ldr", arm_c, arm_r 12 15, arm_a]
-  --, ARMOpcode32 [ARM_EXT_V1] 0x04100000 0x0c100000 [arm_const "ldr", arm_char1 22 22 'b', arm_t, arm_c, arm_r 12 15, arm_a]
+  ,ARMOpcode32 [ARM_EXT_V1] 0x049d0004 0x0fff0fff (arm_cond $ liftM2 (O_LDR Word False) (arm_r 12 15) arm_a)
+  ,ARMOpcode32 [ARM_EXT_V1] 0x04100000 0x0c100000 (arm_cond $ liftM4 O_LDR (arm_bw 22) arm_t (arm_r 12 15) arm_a)
   --, ARMOpcode32 [ARM_EXT_V1] 0x092d0000 0x0fff0000 [arm_const "push", arm_c, arm_m]
   --, ARMOpcode32 [ARM_EXT_V1] 0x08800000 0x0ff00000 [arm_const "stm", arm_c, arm_r 16 19, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
   --, ARMOpcode32 [ARM_EXT_V1] 0x08000000 0x0e100000 [arm_const "stm", arm_arr 23 23 ['i', 'd'], arm_arr 24 24 ['b', 'a'], arm_c, arm_r 16 19, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
