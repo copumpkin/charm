@@ -1,9 +1,4 @@
--- module ARM where
-
-import qualified Data.ByteString as B
-
-import Data.Binary
-import Data.Binary.Get
+module Architecture.ARM.ARM where
 
 import Data.Maybe
 import Data.List
@@ -463,7 +458,11 @@ data ARMOpMemory = OP_MemReg ARMRegister ARMOpData Bool
                  | OP_MemRegPost ARMRegister ARMOpData
                  | OP_MemRegPostNeg ARMRegister ARMOpData
   deriving (Show, Read, Eq)
-  
+
+showArmOpMultiple :: ARMOpMultiple -> String
+showArmOpMultiple (OP_Regs rs) = "{" ++ (intercalate ", " . map showRegister $ rs) ++ "}"
+showArmOpMultiple (OP_RegsCaret rs) = "{" ++ (intercalate ", " . map showRegister $ rs) ++ "}^"
+
 data ARMOpMultiple = OP_Regs [ARMRegister]
                    | OP_RegsCaret [ARMRegister]
   deriving (Show, Read, Eq)
@@ -550,8 +549,8 @@ arm_b (s, i) = ((((fromIntegral i :: Int32) .&. 0xffffff) `xor` 0x800000) - 0x80
 arm_c :: ARMDecoder ARMCondition
 arm_c (_, i) = toEnum $ fromIntegral ((i `shiftR` 28) .&. 0xf)
 
-arm_m :: ARMDecoder [ARMRegister]
-arm_m (s, i) = catMaybes $ map (\x -> if i .&. (1 `shiftL` x) /= 0 then Just $ toEnum x else Nothing) [0..15]
+arm_m :: ARMDecoder ARMOpMultiple
+arm_m (s, i) = OP_Regs . catMaybes $ map (\x -> if i .&. (1 `shiftL` x) /= 0 then Just $ toEnum x else Nothing) [0..15]
 
 arm_o :: ARMDecoder ARMOpData
 arm_o (_, i) | i .&. 0x2000000 /= 0 = OP_Imm . fromIntegral $ (i .&. 0xff) `rotateR` (((fromIntegral i) .&. 0xf00) `shiftR` 7)
@@ -628,14 +627,6 @@ arm_square d = ((("[" ++) . (++ "]")) .) . d
 arm_curly :: ARMDecoder -> ARMDecoder
 arm_curly d = ((("{" ++) . (++ "}")) .) . d
 
-arm_lsl :: ARMDecoder -> ARMDecoder
-arm_lsl d = (("lsl " ++) .) . d
-
-arm_asr :: ARMDecoder -> ARMDecoder
-arm_asr d = (("asr " ++) .) . d
-
-arm_ror :: ARMDecoder -> ARMDecoder
-arm_ror d = (("ror " ++) .) . d
 -}
 
 arm_bit bit (_, i) = bitRange bit bit i
@@ -885,97 +876,3 @@ armDecodeOp x s (ARMOpcode32 _ _ _ d) = d (s, x)
 
 armDecode :: (Word32, Word32) -> Maybe ARMInstruction
 armDecode (a, i) = fmap (armDecodeOp i (ARMState a)) . find (armOpcodeMatches i) $ armOpcodes
-  
-main = mapM_ print . map armDecode $
-                             zip [0x2000,0x2004..] [0xE59D0000,
-                                                    0xE28D1004,
-                                                    0xE2804001,
-                                                    0xE0812104,
-                                                    0xE3CDD007,
-                                                    0xE1A03002,
-                                                    0xE4934004,
-                                                    0xE3540000,
-                                                    0x1AFFFFFC,
-                                                    0xE59FC018,
-                                                    0xE08FC00C,
-                                                    0xE59CC000,
-                                                    0xE12FFF3C,
-                                                    0xE59FC00C,
-                                                    0xE08FC00C,
-                                                    0xE59CC000,
-                                                    0xE12FFF1C,
-                                                    0x000B2FD0,
-                                                    0x000B2FC4,
-                                                    0xE52DC004,
-                                                    0xE59FC00C,
-                                                    0xE79FC00C,
-                                                    0xE52DC004,
-                                                    0xE59FC004,
-                                                    0xE79FF00C,
-                                                    0x000B3748,
-                                                    0x000B38F0,
-                                                    0xE59FC000,
-                                                    0xE79FF00C,
-                                                    0x000B38E4,
-                                                    0xE92D4080,
-                                                    0xE28D7000,
-                                                    0xE24DD004,
-                                                    0xE58D0000,
-                                                    0xE59D2000,
-                                                    0xE3A03001,
-                                                    0xE5823000,
-                                                    0xE247D000,
-                                                    0xE8BD8080,
-                                                    0xE92D4080,
-                                                    0xE28D7000,
-                                                    0xE24DD008,
-                                                    0xE58D0000,
-                                                    0xE59D3000,
-                                                    0xE58D3004,
-                                                    0xE59D3004,
-                                                    0xE593C004,
-                                                    0xE59F3030,
-                                                    0xE08F3003,
-                                                    0xE1A00003,
-                                                    0xE59D1000,
-                                                    0xE59D2000,
-                                                    0xE12FFF3C,
-                                                    0xE1A03000,
-                                                    0xE3530000,
-                                                    0x0A000002,
-                                                    0xE59D2004,
-                                                    0xE3E03000,
-                                                    0xE5823000,
-                                                    0xE247D000,
-                                                    0xE8BD8080,
-                                                    0xFFFFFFB0,
-                                                    0xE92D4090,
-                                                    0xE28D7004,
-                                                    0xE24DD014,
-                                                    0xE58D0008,
-                                                    0xE58D1004,
-                                                    0xE3A03000,
-                                                    0xE58D300C,
-                                                    0xE59D3008,
-                                                    0xE58D3010,
-                                                    0xE28D200C,
-                                                    0xE28DC00C,
-                                                    0xE59D4008,
-                                                    0xE59F3074,
-                                                    0xE08F3003,
-                                                    0xE1A00003,
-                                                    0xE1A01002,
-                                                    0xE1A0200C,
-                                                    0xE12FFF34,
-                                                    0xE1A03000,
-                                                    0xE3530000,
-                                                    0x0A000002,
-                                                    0xE3E03000,
-                                                    0xE58D3000,
-                                                    0xEA00000E,
-                                                    0xE28D300C,
-                                                    0xE59D2004,
-                                                    0xE1A00003,
-                                                    0xE12FFF32,
-                                                    0xE59D300C,
-                                                    0xE3530000] -- -}
