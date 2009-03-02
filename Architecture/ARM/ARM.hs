@@ -13,6 +13,13 @@ import Text.Printf
 import Control.Monad
 import Control.Applicative
 
+
+data ARMOpcode32 = ARMOpcode32 { opcode32_arch :: [ARMArch]
+                               , opcode32_value :: Word32
+                               , opcode32_mask :: Word32
+                               , opcode32_decoder :: ARMDecoder ARMInstruction
+                               }
+
 {-
 data ARMOpRegister = OP_Reg ARMRegister
                    | OP_RegBang ARMRegister
@@ -169,8 +176,8 @@ data ARMConditionalOpcode = O_B Bool Int32 -- B, BL
                           
                           | O_LDM -- Note that there are three different forms
                           | O_STM -- Note that there are two different forms
-                          | O_PUSH [ARMRegister]
-                          | O_POP [ARMRegister]
+                          | O_PUSH ARMOpMultiple
+                          | O_POP ARMOpMultiple
                           
                           | O_SWP Bool ARMRegister ARMRegister ARMRegister -- SWP, SWPB
                           
@@ -209,26 +216,26 @@ data ARMUnconditionalOpcode = O_CPS
 bitRange :: (Integral a, Bits a) => Int -> Int -> a -> a
 bitRange start end i = ((i `shiftR` start) .&. ((2 `shiftL` (end - start)) - 1))
 
-type ARMDecoder a = (ARMState, Word32) -> a
+type ARMDecoder a = Word32 -> a
 
 armDecodeAddress :: ARMDecoder ARMOpMemory
-armDecodeAddress (s, a) | (a .&. 0xf0000) == 0xf0000 && (a .&. 0x2000000) == 0 = 
-                              let offset = a .&. 0xfff in
-                                case a .&. 0x1000000 /= 0 of
-                                  True -> OP_MemReg PC (OP_Imm (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset)) ((a .&. 0x200000) /= 0)
-                                  _    -> OP_MemRegPost PC $ OP_Imm (fromIntegral offset)
-                        | otherwise = 
-                              let baseReg = (toEnum (((fromIntegral a) `shiftR` 16 ) .&. 0xf)) in case a .&. 0x1000000 /= 0 of
-                                False -> if (a .&. 0x2000000) == 0 then
-                                           let offset = a .&. 0xfff in
-                                             if offset /= 0 then
-                                               OP_MemRegPost baseReg $ OP_Imm (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset)
-                                               else OP_MemRegPost baseReg $ OP_Imm 0
-                                           else (if (a .&. 0x800000) == 0 then OP_MemRegPostNeg else OP_MemRegPost) baseReg (armDecodeShift a False)
-                                _     -> if (a .&. 0x2000000) == 0 then
-                                           let offset = a .&. 0xfff in
-                                             OP_MemReg baseReg (OP_Imm (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset)) ((a .&. 0x200000) /= 0)
-                                           else (if (a .&. 0x800000) == 0 then OP_MemRegNeg else OP_MemReg) baseReg (armDecodeShift a False) ((a .&. 0x200000) /= 0)
+armDecodeAddress a | (a .&. 0xf0000) == 0xf0000 && (a .&. 0x2000000) == 0 = 
+                         let offset = a .&. 0xfff in
+                           case a .&. 0x1000000 /= 0 of
+                             True -> OP_MemReg PC (OP_Imm (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset)) ((a .&. 0x200000) /= 0)
+                             _    -> OP_MemRegPost PC $ OP_Imm (fromIntegral offset)
+                   | otherwise = 
+                         let baseReg = (toEnum (((fromIntegral a) `shiftR` 16 ) .&. 0xf)) in case a .&. 0x1000000 /= 0 of
+                           False -> if (a .&. 0x2000000) == 0 then
+                                      let offset = a .&. 0xfff in
+                                        if offset /= 0 then
+                                          OP_MemRegPost baseReg $ OP_Imm (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset)
+                                          else OP_MemRegPost baseReg $ OP_Imm 0
+                                      else (if (a .&. 0x800000) == 0 then OP_MemRegPostNeg else OP_MemRegPost) baseReg (armDecodeShift a False)
+                           _     -> if (a .&. 0x2000000) == 0 then
+                                      let offset = a .&. 0xfff in
+                                        OP_MemReg baseReg (OP_Imm (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset)) ((a .&. 0x200000) /= 0)
+                                      else (if (a .&. 0x800000) == 0 then OP_MemRegNeg else OP_MemReg) baseReg (armDecodeShift a False) ((a .&. 0x200000) /= 0)
 
 armDecodeShift :: Word32 -> Bool -> ARMOpData
 armDecodeShift i p =  if i .&. 0xff0 /= 0 then
@@ -241,107 +248,107 @@ armDecodeShift i p =  if i .&. 0xff0 /= 0 then
                         else OP_Reg (toEnum ((fromIntegral i) .&. 0xf))
 
 arm_const :: String -> ARMDecoder String
-arm_const x (s, i) = x
+arm_const x i = x
 
 arm_constint :: Int -> ARMDecoder String
-arm_constint x (s, i) = show x
+arm_constint x i = show x
 
 arm_a :: ARMDecoder ARMOpMemory
 arm_a = armDecodeAddress 
 
 -- FIXME: wow, this is pretty ugly...
 arm_s :: ARMDecoder ARMOpMemory
-arm_s (s, i) | i .&. 0x4f0000 == 0x4f0000 = OP_MemReg PC (OP_Imm (fromIntegral $ (if i .&. 0x800000 == 0 then -1 else 1) * ((i .&. 0xf00) `shiftR` 4) .|. (i .&. 0xf))) False
-             | i .&. 0x1000000 /= 0 = case i .&. 0x400000 of
-                 0x400000 -> OP_MemReg (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) 
-                                 (OP_Imm $ let offset = ((i .&. 0xf00) `shiftR` 4) .|. (i .&. 0xf) in 
-                                   if (i .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset) 
-                                    ((i .&. 0x200000) /= 0)
-                 _        -> (if (i .&. 0x800000) == 0 then OP_MemRegNeg else OP_MemReg) (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf))
-                                 (OP_Reg $ toEnum ((fromIntegral i) .&. 0xf)) ((i .&. 0x200000) /= 0)
-             | otherwise = case i .&. 0x400000 of
-                 0x400000 -> OP_MemReg (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) 
-                                 (OP_Imm $ let offset = ((i .&. 0xf00) `shiftR` 4) .|. (i .&. 0xf) in 
-                                   (if (i .&. 0x800000) == 0 then  -(fromIntegral offset) else fromIntegral offset))
-                                    False
-                 _        -> (if (i .&. 0x800000) == 0 then OP_MemRegPostNeg else OP_MemRegPost) (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) (OP_Reg $ toEnum ((fromIntegral i) .&. 0xf))
+arm_s i | i .&. 0x4f0000 == 0x4f0000 = OP_MemReg PC (OP_Imm (fromIntegral $ (if i .&. 0x800000 == 0 then -1 else 1) * ((i .&. 0xf00) `shiftR` 4) .|. (i .&. 0xf))) False
+        | i .&. 0x1000000 /= 0 = case i .&. 0x400000 of
+            0x400000 -> OP_MemReg (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) 
+                            (OP_Imm $ let offset = ((i .&. 0xf00) `shiftR` 4) .|. (i .&. 0xf) in 
+                              if (i .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset) 
+                               ((i .&. 0x200000) /= 0)
+            _        -> (if (i .&. 0x800000) == 0 then OP_MemRegNeg else OP_MemReg) (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf))
+                            (OP_Reg $ toEnum ((fromIntegral i) .&. 0xf)) ((i .&. 0x200000) /= 0)
+        | otherwise = case i .&. 0x400000 of
+            0x400000 -> OP_MemReg (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) 
+                            (OP_Imm $ let offset = ((i .&. 0xf00) `shiftR` 4) .|. (i .&. 0xf) in 
+                              (if (i .&. 0x800000) == 0 then  -(fromIntegral offset) else fromIntegral offset))
+                               False
+            _        -> (if (i .&. 0x800000) == 0 then OP_MemRegPostNeg else OP_MemRegPost) (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) (OP_Reg $ toEnum ((fromIntegral i) .&. 0xf))
 
 arm_b :: ARMDecoder Int32
-arm_b (s, i) = ((((fromIntegral i :: Int32) .&. 0xffffff) `xor` 0x800000) - 0x800000) * 4 + (fromIntegral $ pc s) + 8
+arm_b i = ((((fromIntegral i :: Int32) .&. 0xffffff) `xor` 0x800000) - 0x800000) * 4 + {-(fromIntegral $ pc s) + -} 8
 
 arm_c :: ARMDecoder ARMCondition
-arm_c (_, i) = toEnum $ fromIntegral ((i `shiftR` 28) .&. 0xf)
+arm_c i = toEnum $ fromIntegral ((i `shiftR` 28) .&. 0xf)
 
 arm_m :: ARMDecoder ARMOpMultiple
-arm_m (s, i) = OP_Regs . catMaybes $ map (\x -> if i .&. (1 `shiftL` x) /= 0 then Just $ toEnum x else Nothing) [0..15]
+arm_m i = OP_Regs . catMaybes $ map (\x -> if i .&. (1 `shiftL` x) /= 0 then Just $ toEnum x else Nothing) [0..15]
 
 arm_o :: ARMDecoder ARMOpData
-arm_o (_, i) | i .&. 0x2000000 /= 0 = OP_Imm . fromIntegral $ (i .&. 0xff) `rotateR` (((fromIntegral i) .&. 0xf00) `shiftR` 7)
-             | otherwise = armDecodeShift i True
+arm_o i | i .&. 0x2000000 /= 0 = OP_Imm . fromIntegral $ (i .&. 0xff) `rotateR` (((fromIntegral i) .&. 0xf00) `shiftR` 7)
+        | otherwise = armDecodeShift i True
 
 arm_p :: ARMDecoder Bool
-arm_p (s, i) = i .&. 0xf000 == 0xf000
+arm_p i = i .&. 0xf000 == 0xf000
 
 arm_t :: ARMDecoder Bool
-arm_t (s, i) = i .&. 0x1200000 == 0x200000
+arm_t i = i .&. 0x1200000 == 0x200000
 
 arm_q :: ARMDecoder ARMOpData
-arm_q (s, i) = armDecodeShift i False
+arm_q i = armDecodeShift i False
 
 arm_e :: ARMDecoder Word32
-arm_e (s, i) = (i .&. 0xf) .|. ((i .&. 0xfff00) `shiftR` 4)
+arm_e i = (i .&. 0xf) .|. ((i .&. 0xfff00) `shiftR` 4)
 
 arm_B :: ARMDecoder Int32
-arm_B (s, i) = let offset = ((if i .&. 0x800000 /= 0 then 0xff else 0) + (i .&. 0xffffff)) `shiftL` 2 
-                   address = offset + (pc s) + 8 + (if i .&. 0x1000000 /= 0 then 2 else 0) in
-                     fromIntegral address
+arm_B i = let offset = ((if i .&. 0x800000 /= 0 then 0xff else 0) + (i .&. 0xffffff)) `shiftL` 2 
+              address = offset + {-(pc s) + -} 8 + (if i .&. 0x1000000 /= 0 then 2 else 0) in
+                fromIntegral address
               
 -- FIXME: this is ugly
 arm_C :: ARMDecoder String
-arm_C (s, i) = '_' : (if i .&. 0x80000 /= 0 then "f" else "" ++ 
-                   if i .&. 0x40000 /= 0 then "s" else "" ++
-                   if i .&. 0x20000 /= 0 then "x" else "" ++
-                   if i .&. 0x10000 /= 0 then "c" else "")
+arm_C i = '_' : (if i .&. 0x80000 /= 0 then "f" else "" ++ 
+                 if i .&. 0x40000 /= 0 then "s" else "" ++
+                 if i .&. 0x20000 /= 0 then "x" else "" ++
+                 if i .&. 0x10000 /= 0 then "c" else "")
 
 arm_U :: ARMDecoder ARMHint
-arm_U (s, i) = case i .&. 0xf of
-                 0xf -> SY
-                 0x7 -> UN
-                 0xe -> ST
-                 0x6 -> UNST
-                 x   -> UK x
+arm_U i = case i .&. 0xf of
+            0xf -> SY
+            0x7 -> UN
+            0xe -> ST
+            0x6 -> UNST
+            x   -> UK x
 
 arm_P :: ARMDecoder ARMOpMemory
-arm_P (s, i) = armDecodeAddress (s, (i .|. (1 `shiftL` 24)))
+arm_P i = armDecodeAddress $ i .|. (1 `shiftL` 24)
 
 arm_r :: Int -> Int -> ARMDecoder ARMRegister
-arm_r start end (_, i) = toEnum (bitRange start end $ fromIntegral i)
+arm_r start end i = toEnum (bitRange start end $ fromIntegral i)
 
 arm_d :: (Integral a, Bits a) => Int -> Int -> ARMDecoder a
-arm_d start end (_, i) = bitRange start end $ fromIntegral i
+arm_d start end i = bitRange start end $ fromIntegral i
 
 arm_W :: (Integral a, Bits a) => Int -> Int -> ARMDecoder a
-arm_W start end (_, i) = (+1) . bitRange start end $ fromIntegral i
+arm_W start end i = (+1) . bitRange start end $ fromIntegral i
 
 arm_x :: (Integral a, Bits a) => Int -> Int -> ARMDecoder a
 arm_x = arm_d
 
 arm_X :: Int -> Int -> ARMDecoder Word32
-arm_X start end (s, i) = (.&. 0xf) . bitRange start end $ i
+arm_X start end i = (.&. 0xf) . bitRange start end $ i
 
 arm_arr :: Int -> Int -> [a] -> ARMDecoder a
-arm_arr start end c (_, i) = c !! (fromIntegral $ bitRange start end i)
+arm_arr start end c i = c !! (fromIntegral $ bitRange start end i)
 
 arm_E :: ARMDecoder (Maybe (Word32, Word32))
-arm_E (_, i) = let msb = (i .&. 0x1f0000) `shiftR` 16
-                   lsb = (i .&. 0xf80) `shiftR` 7
-                   width = msb - lsb + 1 in
-                 if width > 0 then
-                   Just (lsb, width) --"#" ++ (show lsb) ++ ", #" ++ (show width)
-                   else Nothing --"(invalid " ++ (show lsb) ++ ":" ++ (show msb) ++ ")"            
+arm_E i = let msb = (i .&. 0x1f0000) `shiftR` 16
+              lsb = (i .&. 0xf80) `shiftR` 7
+              width = msb - lsb + 1 in
+            if width > 0 then
+              Just (lsb, width) --"#" ++ (show lsb) ++ ", #" ++ (show width)
+              else Nothing --"(invalid " ++ (show lsb) ++ ":" ++ (show msb) ++ ")"            
 
 arm_V :: ARMDecoder Word32
-arm_V (_, i) = (i .&. 0xf0000) `shiftR` 4 .|. (i .&. 0xfff)
+arm_V i = (i .&. 0xf0000) `shiftR` 4 .|. (i .&. 0xfff)
 
 {-
 arm_square :: ARMDecoder -> ARMDecoder
@@ -352,7 +359,7 @@ arm_curly d = ((("{" ++) . (++ "}")) .) . d
 
 -}
 
-arm_bit bit (_, i) = bitRange bit bit i
+arm_bit bit i = bitRange bit bit i
 
 arm_bool bit s = arm_bit bit s == 1
 
@@ -360,7 +367,7 @@ arm_uncond = liftM ARMUnconditionalInstruction
 
 arm_cond = liftM2 ARMConditionalInstruction arm_c
 
-arm_bw bit (_, i) = if bitRange bit bit i == 1 then Byte else Word
+arm_bw bit i = if bitRange bit bit i == 1 then Byte else Word
 
 armOpcodes = 
   [--ARMOpcode32 [ARM_EXT_V1] 0xe1a00000 0xffffffff [arm_const "nop"]
@@ -594,8 +601,8 @@ armOpcodes =
 armOpcodeMatches :: Word32 -> ARMOpcode32 -> Bool
 armOpcodeMatches x (ARMOpcode32 _ v m _) = x .&. m == v 
 
-armDecodeOp :: Word32 -> ARMState -> ARMOpcode32 -> ARMInstruction
-armDecodeOp x s (ARMOpcode32 _ _ _ d) = d (s, x)
+armDecodeOp :: Word32 -> ARMOpcode32 -> ARMInstruction
+armDecodeOp x (ARMOpcode32 _ _ _ d) = d x
 
 armDecode :: (Word32, Word32) -> Maybe ARMInstruction
-armDecode (a, i) = fmap (armDecodeOp i (ARMState a)) . find (armOpcodeMatches i) $ armOpcodes
+armDecode (a, i) = fmap (armDecodeOp i) . find (armOpcodeMatches i) $ armOpcodes

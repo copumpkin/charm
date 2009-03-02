@@ -1,5 +1,8 @@
 module Architecture.ARM.Common where
-    
+
+import Data.Word
+import Data.Int
+
 data ARMArch = ARM_EXT_V1
              | ARM_EXT_V2
              | ARM_EXT_V2S
@@ -25,12 +28,6 @@ data ARMArch = ARM_EXT_V1
              | FPU_VFP_EXT_V1xD
              | FPU_VFP_EXT_V2
              | FPU_VFP_EXT_V3
-
-data ARMOpcode32 = ARMOpcode32 { opcode32_arch :: [ARMArch]
-                               , opcode32_value :: Word32
-                               , opcode32_mask :: Word32
-                               , opcode32_decoder :: (ARMState, Word32) -> ARMInstruction
-                               }
 
 data ARMState = ARMState { pc :: Word32 }
 
