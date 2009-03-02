@@ -14,6 +14,7 @@ import Data.Bits
 import Text.Printf
 
 import Control.Monad
+import Control.Applicative
 
 import Debug.Trace
 
@@ -145,12 +146,12 @@ data ARMConditionalOpcode = O_B Bool Int32 -- B, BL
                           | O_SMMLS Bool ARMRegister ARMRegister ARMRegister ARMRegister
                           | O_SMUAD Nybble ARMRegister ARMRegister ARMRegister
                           | O_SMUL Nybble Nybble ARMRegister ARMRegister ARMRegister
-                          | O_SMULL
+                          | O_SMULL Bool ARMRegister ARMRegister ARMRegister ARMRegister
                           | O_SMULW Nybble ARMRegister ARMRegister ARMRegister
                           | O_SMUSD Nybble ARMRegister ARMRegister ARMRegister
                           | O_UMAAL ARMRegister ARMRegister ARMRegister ARMRegister
-                          | O_UMLAL
-                          | O_UMULL
+                          | O_UMLAL Bool ARMRegister ARMRegister ARMRegister ARMRegister
+                          | O_UMULL Bool ARMRegister ARMRegister ARMRegister ARMRegister
                           
                           | O_QADD ARMRegister ARMRegister ARMRegister
                           | O_QADD16 ARMRegister ARMRegister ARMRegister
@@ -491,8 +492,8 @@ armOpcodes =
   ,ARMOpcode32 [ARM_EXT_V2] 0x00000090 0x0fe000f0 (arm_cond $ liftM4 O_MUL (arm_bool 20) (arm_r 16 19) (arm_r 0 3) (arm_r 8 11))
   ,ARMOpcode32 [ARM_EXT_V2] 0x00200090 0x0fe000f0 (arm_cond $ liftM5 O_MLA (arm_bool 20) (arm_r 16 19) (arm_r 0 3) (arm_r 8 11) (arm_r 12 15))
   --, ARMOpcode32 [ARM_EXT_V2S] 0x01000090 0x0fb00ff0 [arm_const "swp", arm_char1 22 22 'b', arm_c, arm_r 12 15, arm_r 0 3, arm_square (arm_r 16 19)]
-  --, ARMOpcode32 [ARM_EXT_V3M] 0x00800090 0x0fa000f0 [arm_arr 22 22 ['s', 'u'], arm_const "mull", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_r 16 19, arm_r 0 3, arm_r 8 11]
-  --, ARMOpcode32 [ARM_EXT_V3M] 0x00800090 0x0fa000f0 [arm_arr 22 22 ['s', 'u'], arm_const "mlal", arm_char1 20 20 's', arm_c, arm_r 12 15, arm_r 16 19, arm_r 0 3, arm_r 8 11]
+  ,ARMOpcode32 [ARM_EXT_V3M] 0x00800090 0x0fa000f0 (arm_cond $ (arm_arr 22 22 [O_SMULL, O_UMULL]) `ap` (arm_bool 20) `ap` (arm_r 12 15) `ap` (arm_r 16 19) `ap` (arm_r 0 3) `ap` (arm_r 8 11))
+  --,ARMOpcode32 [ARM_EXT_V3M] 0x00800090 0x0fa000f0 (arm_cond $ (arm_arr 22 22 [O_SMLAL, O_UMLAL]) `ap` (arm_bool 20) `ap` (arm_r 12 15) `ap` (arm_r 16 19) `ap` (arm_r 0 3) `ap` (arm_r 8 11))
   --,ARMOpcode32 [ARM_EXT_V7] 0xf450f000 0xfd70f000 (arm_cond $ liftM O_PLI arm_P)
   ,ARMOpcode32 [ARM_EXT_V7] 0x0320f0f0 0x0ffffff0 (arm_cond $ liftM O_DBG (arm_d 0 3))
   ,ARMOpcode32 [ARM_EXT_V7] 0xf57ff050 0x0ffffff0 (arm_cond $ liftM O_DMB arm_U)
@@ -570,10 +571,10 @@ armOpcodes =
   ,ARMOpcode32 [ARM_EXT_V6] 0x06bf0fb0 0x0fff0ff0 (arm_cond $ liftM2 O_REV16     (arm_r 12 15) (arm_r 0 3))
   ,ARMOpcode32 [ARM_EXT_V6] 0x06ff0fb0 0x0fff0ff0 (arm_cond $ liftM2 O_REVSH     (arm_r 12 15) (arm_r 0 3))
   --, ARMOpcode32 [ARM_EXT_V6] 0xf8100a00 0xfe50ffff [arm_const "rfe", arm_arr 23 23 ['i', 'd'], arm_arr 24 24 ['b', 'a'], arm_r 16 19, arm_char1 21 21 '!']
-  ,ARMOpcode32 [ARM_EXT_V6] 0x06bf0070 0x0fff0ff0 (arm_cond $ liftM2 (O_SXT HalfWord) (arm_r 12 15) (OP_Reg . arm_r 0 3))--, ARMOpcode32 [ARM_EXT_V6] 0x06bf0070 0x0fff0ff0 [arm_const "sxth", arm_c, arm_r 12 15, arm_r 0 3]
-  ,ARMOpcode32 [ARM_EXT_V6] 0x06bf0470 0x0fff0ff0 (arm_cond $ liftM2 (O_SXT HalfWord) (arm_r 12 15) (OP_RegShiftImm S_ROR 8 . arm_r 0 3))--, ARMOpcode32 [ARM_EXT_V6] 0x06bf0470 0x0fff0ff0 [arm_const "sxth", arm_c, arm_r 12 15, arm_r 0 3, arm_ror (arm_constint 8)] 
-  ,ARMOpcode32 [ARM_EXT_V6] 0x06bf0870 0x0fff0ff0 (arm_cond $ liftM2 (O_SXT HalfWord) (arm_r 12 15) (OP_RegShiftImm S_ROR 16 . arm_r 0 3))--, ARMOpcode32 [ARM_EXT_V6] 0x06bf0870 0x0fff0ff0 [arm_const "sxth", arm_c, arm_r 12 15, arm_r 0 3, arm_ror (arm_constint 16)]
-  ,ARMOpcode32 [ARM_EXT_V6] 0x06bf0c70 0x0fff0ff0 (arm_cond $ liftM2 (O_SXT HalfWord) (arm_r 12 15) (OP_RegShiftImm S_ROR 24 . arm_r 0 3))--, ARMOpcode32 [ARM_EXT_V6] 0x06bf0c70 0x0fff0ff0 [arm_const "sxth", arm_c, arm_r 12 15, arm_r 0 3, arm_ror (arm_constint 24)]
+  ,ARMOpcode32 [ARM_EXT_V6] 0x06bf0070 0x0fff0ff0 (arm_cond $ liftM2 (O_SXT HalfWord) (arm_r 12 15) (OP_Reg . arm_r 0 3))
+  ,ARMOpcode32 [ARM_EXT_V6] 0x06bf0470 0x0fff0ff0 (arm_cond $ liftM2 (O_SXT HalfWord) (arm_r 12 15) (OP_RegShiftImm S_ROR 8 . arm_r 0 3))
+  ,ARMOpcode32 [ARM_EXT_V6] 0x06bf0870 0x0fff0ff0 (arm_cond $ liftM2 (O_SXT HalfWord) (arm_r 12 15) (OP_RegShiftImm S_ROR 16 . arm_r 0 3))
+  ,ARMOpcode32 [ARM_EXT_V6] 0x06bf0c70 0x0fff0ff0 (arm_cond $ liftM2 (O_SXT HalfWord) (arm_r 12 15) (OP_RegShiftImm S_ROR 24 . arm_r 0 3))
   ,ARMOpcode32 [ARM_EXT_V6] 0x068f0070 0x0fff0ff0 (arm_cond $ liftM2 O_SXTB16         (arm_r 12 15) (OP_Reg . arm_r 0 3))
   ,ARMOpcode32 [ARM_EXT_V6] 0x068f0470 0x0fff0ff0 (arm_cond $ liftM2 O_SXTB16         (arm_r 12 15) (OP_RegShiftImm S_ROR 8 . arm_r 0 3))
   ,ARMOpcode32 [ARM_EXT_V6] 0x068f0870 0x0fff0ff0 (arm_cond $ liftM2 O_SXTB16         (arm_r 12 15) (OP_RegShiftImm S_ROR 16 . arm_r 0 3))
@@ -678,8 +679,8 @@ armOpcodes =
   ,ARMOpcode32 [ARM_EXT_V1] 0x00a00000 0x0de00000 (arm_cond $ liftM4 O_ADC (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
   ,ARMOpcode32 [ARM_EXT_V1] 0x00c00000 0x0de00000 (arm_cond $ liftM4 O_SBC (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
   ,ARMOpcode32 [ARM_EXT_V1] 0x00e00000 0x0de00000 (arm_cond $ liftM4 O_RSC (arm_bool 20) (arm_r 12 15) (arm_r 16 19) arm_o)
-  --, ARMOpcode32 [ARM_EXT_V3] 0x0120f000 0x0db0f000 [arm_const "msr", arm_c, arm_arr 22 22 ['S', 'C'], arm_const "PSR", arm_C, arm_o]
-  --, ARMOpcode32 [ARM_EXT_V3] 0x010f0000 0x0fbf0fff [arm_const "mrs", arm_c, arm_r 12 15, arm_arr 22 22 ['S', 'C'], arm_const "PSR"]
+  --,ARMOpcode32 [ARM_EXT_V3] 0x0120f000 0x0db0f000 (arm_cond $ liftM3 O_MSR (arm_arr 22 22 [SPSR, CPSR]) arm_C arm_o)
+  --,ARMOpcode32 [ARM_EXT_V3] 0x010f0000 0x0fbf0fff (arm_cond $ liftM2 O_MRS (arm_r 12 15) (arm_arr 22 22 [SPSR, CPSR]))
   ,ARMOpcode32 [ARM_EXT_V1] 0x01000000 0x0de00000 (arm_cond $ liftM2 O_TST {-arm_p-} (arm_r 16 19) arm_o)
   ,ARMOpcode32 [ARM_EXT_V1] 0x01200000 0x0de00000 (arm_cond $ liftM2 O_TEQ {-arm_p-} (arm_r 16 19) arm_o)
   ,ARMOpcode32 [ARM_EXT_V1] 0x01400000 0x0de00000 (arm_cond $ liftM2 O_CMP {-arm_p-} (arm_r 16 19) arm_o)
@@ -709,7 +710,7 @@ armOpcodes =
   --, ARMOpcode32 [ARM_EXT_V1] 0x08bd0000 0x0fff0000 [arm_const "pop", arm_c, arm_m]
   --, ARMOpcode32 [ARM_EXT_V1] 0x08900000 0x0f900000 [arm_const "ldm", arm_c, arm_r 16 19, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
   --, ARMOpcode32 [ARM_EXT_V1] 0x08100000 0x0e100000 [arm_const "ldm", arm_arr 23 23 ['i', 'd'], arm_arr 24 24 ['b', 'a'], arm_c, arm_r 16 19, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
-  ,ARMOpcode32 [ARM_EXT_V1] 0x0a000000 0x0e000000 (arm_cond $ liftM2 O_B (arm_bool 24) arm_b)--, ARMOpcode32 [ARM_EXT_V1] 0x0a000000 0x0e000000 [arm_const "b", arm_char1 24 24 'l', arm_c, arm_b]
+  ,ARMOpcode32 [ARM_EXT_V1] 0x0a000000 0x0e000000 (arm_cond $ liftM2 O_B (arm_bool 24) arm_b)
   --, ARMOpcode32 [ARM_EXT_V1] 0x0f000000 0x0f000000 [arm_const "svc", arm_c, arm_x 0 23] -- does this belong?
   --, ARMOpcode32 [ARM_EXT_V1] 0x00000000 0x00000000 [arm_const "undefined instruction", arm_x 0 31]  
   ]
