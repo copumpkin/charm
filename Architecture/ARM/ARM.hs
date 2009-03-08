@@ -363,9 +363,8 @@ arm_bit bit i = bitRange bit bit i
 
 arm_bool bit s = arm_bit bit s == 1
 
-arm_uncond = liftM ARMUnconditionalInstruction
-
-arm_cond = liftM2 ARMConditionalInstruction arm_c
+arm_uncond = liftM  ARMUnconditionalInstruction
+arm_cond   = liftM2 ARMConditionalInstruction arm_c
 
 arm_bw bit i = if bitRange bit bit i == 1 then Byte else Word
 
@@ -604,5 +603,5 @@ armOpcodeMatches x (ARMOpcode32 _ v m _) = x .&. m == v
 armDecodeOp :: Word32 -> ARMOpcode32 -> ARMInstruction
 armDecodeOp x (ARMOpcode32 _ _ _ d) = d x
 
-armDecode :: (Word32, Word32) -> Maybe ARMInstruction
-armDecode (a, i) = fmap (armDecodeOp i) . find (armOpcodeMatches i) $ armOpcodes
+armDecode :: Word32 -> Maybe ARMInstruction
+armDecode i = fmap (armDecodeOp i) . find (armOpcodeMatches i) $ armOpcodes
