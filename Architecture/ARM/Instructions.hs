@@ -1,5 +1,7 @@
 module Architecture.ARM.Instructions where
 
+import Prelude hiding (and)
+
 import Architecture.ARM.Common
 
 import Data.Int
@@ -30,6 +32,7 @@ data ARMOpMultiple = Regs [ARMRegister]
 
 data ARMInstruction = ARMUnconditionalInstruction ARMUnconditionalOpcode
                     | ARMConditionalInstruction ARMCondition ARMConditionalOpcode
+                    | ARMUndefined
   deriving (Show, Read, Eq)
 
 data ARMConditionalOpcode = B Bool Int32 -- B, BL
@@ -38,70 +41,134 @@ data ARMConditionalOpcode = B Bool Int32 -- B, BL
                           | BX ARMRegister
                           | BXJ ARMRegister
                           
-                          | AND  Bool ARMRegister ARMRegister ARMOpData -- AND, ANDS
+                          | AND  ARMRegister ARMRegister ARMOpData -- AND, ANDS
                           | ANDS ARMRegister ARMRegister ARMOpData -- NEW
-                          | EOR  Bool ARMRegister ARMRegister ARMOpData -- EOR, EORS
+                          
+                          | EOR  ARMRegister ARMRegister ARMOpData -- EOR, EORS
                           | EORS ARMRegister ARMRegister ARMOpData -- NEW
-                          | SUB  Bool ARMRegister ARMRegister ARMOpData -- SUB, SUBS
+                          
+                          | SUB  ARMRegister ARMRegister ARMOpData -- SUB, SUBS
                           | SUBS ARMRegister ARMRegister ARMOpData -- NEW
-                          | RSB  Bool ARMRegister ARMRegister ARMOpData -- RSB, RSBS
+
+                          | RSB  ARMRegister ARMRegister ARMOpData -- RSB, RSBS
                           | RSBS ARMRegister ARMRegister ARMOpData -- NEW
-                          | ADD  Bool ARMRegister ARMRegister ARMOpData -- ADD, ADDS
+
+                          | ADD  ARMRegister ARMRegister ARMOpData -- ADD, ADDS
                           | ADDS ARMRegister ARMRegister ARMOpData -- NEW
-                          | ADC  Bool ARMRegister ARMRegister ARMOpData -- ADC, ADCS
+
+                          | ADC  ARMRegister ARMRegister ARMOpData -- ADC, ADCS
                           | ADCS ARMRegister ARMRegister ARMOpData -- NEW
-                          | SBC  Bool ARMRegister ARMRegister ARMOpData -- SBC, SBCS
+
+                          | SBC  ARMRegister ARMRegister ARMOpData -- SBC, SBCS
                           | SBCS ARMRegister ARMRegister ARMOpData -- NEW
-                          | RSC  Bool ARMRegister ARMRegister ARMOpData -- RSC, RSCS
+
+                          | RSC  ARMRegister ARMRegister ARMOpData -- RSC, RSCS
                           | RSCS ARMRegister ARMRegister ARMOpData -- NEW
+
                           | TST ARMRegister ARMOpData -- TST
                           | TEQ ARMRegister ARMOpData -- TEQ
                           | CMP ARMRegister ARMOpData -- CMP
                           | CMN ARMRegister ARMOpData -- CMN
-                          | ORR  Bool ARMRegister ARMRegister ARMOpData -- ORR, ORRS
-                          | ORRS ARMRegister ARMRegister ARMOpData -- NEW
-                          | MOV  Bool ARMRegister ARMOpData -- MOV, MOVS
-                          | MOVS ARMRegister ARMOpData -- NEW
-                          | LSL  Bool ARMRegister ARMOpData
-                          | LSLS ARMRegister ARMOpData -- NEW
-                          | LSR  Bool ARMRegister ARMOpData
-                          | LSRS ARMRegister ARMOpData -- NEW
-                          | ASR  Bool ARMRegister ARMOpData
-                          | ASRS ARMRegister ARMOpData -- NEW
-                          | RRX  Bool ARMRegister ARMRegister 
-                          | RRXS ARMRegister ARMRegister -- NEW
-                          | ROR  Bool ARMRegister ARMOpData
-                          | RORS ARMRegister ARMOpData -- NEW
-                          | BIC  Bool ARMRegister ARMRegister ARMOpData -- BIC, BICS
-                          | BICS ARMRegister ARMRegister ARMOpData -- NEW
-                          | MVN  Bool ARMRegister ARMOpData -- MVN, MVNS
-                          | MVNS ARMRegister ARMOpData -- NEW
+
+                          | ORR  ARMRegister ARMRegister ARMOpData
+                          | ORRS ARMRegister ARMRegister ARMOpData
+
+                          | MOV  ARMRegister ARMOpData
+                          | MOVS ARMRegister ARMOpData
+
+                          | LSL  ARMRegister ARMOpData
+                          | LSLS ARMRegister ARMOpData
+
+                          | LSR  ARMRegister ARMOpData
+                          | LSRS ARMRegister ARMOpData
+
+                          | ASR  ARMRegister ARMOpData
+                          | ASRS ARMRegister ARMOpData
+
+                          | RRX  ARMRegister ARMRegister 
+                          | RRXS ARMRegister ARMRegister
+
+                          | ROR  ARMRegister ARMOpData
+                          | RORS ARMRegister ARMOpData
+
+                          | BIC  ARMRegister ARMRegister ARMOpData
+                          | BICS ARMRegister ARMRegister ARMOpData
+
+                          | MVN  ARMRegister ARMOpData
+                          | MVNS ARMRegister ARMOpData
                                                     
-                          | MLA Bool ARMRegister ARMRegister ARMRegister ARMRegister
-                          | MUL Bool ARMRegister ARMRegister ARMRegister 
+                          | MLA  ARMRegister ARMRegister ARMRegister ARMRegister
+                          | MLAS ARMRegister ARMRegister ARMRegister ARMRegister
+
+                          | MUL  ARMRegister ARMRegister ARMRegister 
+                          | MULS ARMRegister ARMRegister ARMRegister 
+
+ 
                           | SMLA Nybble Nybble ARMRegister ARMRegister ARMRegister ARMRegister -- SMLABB, SMLABT, SBMLATB, SMLATT
                           | SMLABB ARMRegister ARMRegister ARMRegister ARMRegister -- NEW
                           | SMLABT ARMRegister ARMRegister ARMRegister ARMRegister -- NEW
                           | SMLATB ARMRegister ARMRegister ARMRegister ARMRegister -- NEW
                           | SMLATT ARMRegister ARMRegister ARMRegister ARMRegister -- NEW
-                          | SMLAD Nybble ARMRegister ARMRegister ARMRegister ARMRegister
-                          | SMLAL (Maybe (Nybble, Nybble)) ARMRegister ARMRegister ARMRegister ARMRegister -- FIXME: first two ArmRegisters are more complicated
-                          | SMLALD Nybble ARMRegister ARMRegister ARMRegister ARMRegister -- FIXME as above
+ 
+                          | SMLAD  ARMRegister ARMRegister ARMRegister ARMRegister
+                          | SMLADX ARMRegister ARMRegister ARMRegister ARMRegister
+
+                          | SMLAL  ARMRegister ARMRegister ARMRegister ARMRegister -- FIXME: are first two ArmRegisters more complicated?
+                          | SMLALS ARMRegister ARMRegister ARMRegister ARMRegister -- FIXME: are first two ArmRegisters more complicated?
+
+                          | SMLALBB ARMRegister ARMRegister ARMRegister ARMRegister
+                          | SMLALBT ARMRegister ARMRegister ARMRegister ARMRegister
+                          | SMLALTB ARMRegister ARMRegister ARMRegister ARMRegister
+                          | SMLALTT ARMRegister ARMRegister ARMRegister ARMRegister
+
+                          | SMLALD  ARMRegister ARMRegister ARMRegister ARMRegister
+                          | SMLALDX ARMRegister ARMRegister ARMRegister ARMRegister
+
                           | SMLAW Nybble ARMRegister ARMRegister ARMRegister ARMRegister
-                          | SMLSD Nybble ARMRegister ARMRegister ARMRegister ARMRegister
-                          | SMLSLD Nybble ARMRegister ARMRegister ARMRegister ARMRegister -- FIXME as above
-                          | SMMLA Bool ARMRegister ARMRegister ARMRegister ARMRegister
-                          | SMMUL Bool ARMRegister ARMRegister ARMRegister 
-                          | SMMLS Bool ARMRegister ARMRegister ARMRegister ARMRegister
-                          | SMUAD Nybble ARMRegister ARMRegister ARMRegister
-                          | SMUL Nybble Nybble ARMRegister ARMRegister ARMRegister
-                          | SMULL Bool ARMRegister ARMRegister ARMRegister ARMRegister
-                          | SMULW Nybble ARMRegister ARMRegister ARMRegister
-                          | SMUSD Nybble ARMRegister ARMRegister ARMRegister
-                          | UMAAL ARMRegister ARMRegister ARMRegister ARMRegister
-                          | UMLAL Bool ARMRegister ARMRegister ARMRegister ARMRegister
-                          | UMULL Bool ARMRegister ARMRegister ARMRegister ARMRegister
+
+                          | SMLSD  ARMRegister ARMRegister ARMRegister ARMRegister
+                          | SMLSDX ARMRegister ARMRegister ARMRegister ARMRegister
                           
+                          | SMLSLD  ARMRegister ARMRegister ARMRegister ARMRegister
+                          | SMLSLDX ARMRegister ARMRegister ARMRegister ARMRegister
+
+                          | SMMLA  ARMRegister ARMRegister ARMRegister ARMRegister
+                          | SMMLAR ARMRegister ARMRegister ARMRegister ARMRegister
+
+                          | SMMUL  ARMRegister ARMRegister ARMRegister 
+                          | SMMULR ARMRegister ARMRegister ARMRegister 
+
+                          | SMMLS  ARMRegister ARMRegister ARMRegister ARMRegister
+                          | SMMLSR ARMRegister ARMRegister ARMRegister ARMRegister
+
+                          | SMUAD  ARMRegister ARMRegister ARMRegister
+                          | SMUADX ARMRegister ARMRegister ARMRegister
+ 
+                          | SMUL Nybble Nybble ARMRegister ARMRegister ARMRegister
+                          | SMULBB ARMRegister ARMRegister ARMRegister -- NEW
+                          | SMULBT ARMRegister ARMRegister ARMRegister -- NEW
+                          | SMULTB ARMRegister ARMRegister ARMRegister -- NEW
+                          | SMULTT ARMRegister ARMRegister ARMRegister -- NEW
+ 
+                          | SMULL  ARMRegister ARMRegister ARMRegister ARMRegister
+                          | SMULLS ARMRegister ARMRegister ARMRegister ARMRegister                          
+                          
+                          | SMULW Nybble ARMRegister ARMRegister ARMRegister
+                          
+                          | SMULWB ARMRegister ARMRegister ARMRegister -- NEW
+                          | SMULWT ARMRegister ARMRegister ARMRegister -- NEW
+                          
+                          | SMUSD  ARMRegister ARMRegister ARMRegister
+                          | SMUSDX ARMRegister ARMRegister ARMRegister
+
+                          | UMAAL ARMRegister ARMRegister ARMRegister ARMRegister
+                     
+                          | UMLAL  ARMRegister ARMRegister ARMRegister ARMRegister
+                          | UMLALS ARMRegister ARMRegister ARMRegister ARMRegister
+
+                          | UMULL  ARMRegister ARMRegister ARMRegister ARMRegister
+                          | UMULLS ARMRegister ARMRegister ARMRegister ARMRegister
+                                                    
                           | QADD ARMRegister ARMRegister ARMRegister
                           | QADD16 ARMRegister ARMRegister ARMRegister
                           | QADD8 ARMRegister ARMRegister ARMRegister
@@ -160,8 +227,8 @@ data ARMConditionalOpcode = B Bool Int32 -- B, BL
                           | UXTAH ARMRegister ARMRegister ARMOpData -- rotate
                           | UXTB16 ARMRegister ARMOpData -- rotate
                           | UXT Width ARMRegister ARMOpData -- rotate -- UXTB, UXTH
-                          | UXTB Width ARMRegister ARMOpData -- rotate -- NEW
-                          | UXTH Width ARMRegister ARMOpData -- rotate -- NEW
+                          | UXTB ARMRegister ARMOpData -- rotate -- NEW
+                          | UXTH ARMRegister ARMOpData -- rotate -- NEW
 
                           
                           | CLZ ARMRegister ARMRegister
@@ -181,22 +248,33 @@ data ARMConditionalOpcode = B Bool Int32 -- B, BL
                           | MRS ARMRegister ARMStatusRegister
                           | MSR 
                           
-                          | LDR Width Bool Bool ARMRegister ARMOpMemory -- LDR, LDRB, LDRH, LDRD, LDRT LDRBT, LDRSB, LDRSH -- TODO: some of these combinations are invalid, should we stop that?
-                          | LDRB ARMRegister ARMOpMemory -- NEW
-                          | LDRH ARMRegister ARMOpMemory -- NEW
-                          | LDRD ARMRegister ARMOpMemory -- NEW
-                          | LDRT ARMRegister ARMOpMemory -- NEW
-                          | LDRBT ARMRegister ARMOpMemory -- NEW
-                          | LDRSB ARMRegister ARMOpMemory -- NEW
-                          | LDRSH ARMRegister ARMOpMemory -- NEW
-                          | STR Width Bool Bool ARMRegister ARMOpMemory -- STR, STRB, STRH, STRD, STRT, STRBT
+                          | LDR  ARMRegister ARMOpMemory 
+                          | LDRB ARMRegister ARMOpMemory 
+                          | LDRH ARMRegister ARMOpMemory 
+                          | LDRD ARMRegister ARMOpMemory 
+
+                          | LDRBT ARMRegister ARMOpMemory
+                          | LDRHT ARMRegister ARMOpMemory
+                          | LDRT  ARMRegister ARMOpMemory
+
+                          | LDRSB ARMRegister ARMOpMemory
+                          | LDRSH ARMRegister ARMOpMemory 
+                          
+                          
+                          | STR  ARMRegister ARMOpMemory -- STR, STRB, STRH, STRD, STRT, STRBT
                           | STRB ARMRegister ARMOpMemory
                           | STRH ARMRegister ARMOpMemory
                           | STRD ARMRegister ARMOpMemory
-                          | STRT ARMRegister ARMOpMemory
+
                           | STRBT ARMRegister ARMOpMemory
-                          | LDREX
-                          | STREX
+                          | STRHT ARMRegister ARMOpMemory
+                          | STRT ARMRegister ARMOpMemory
+
+
+
+                          | LDREX ARMRegister ARMRegister ARMOpMemory
+                          | STREX ARMRegister ARMRegister ARMOpMemory
+                          | STREXD ARMRegister ARMRegister ARMRegister ARMOpMemory                          
                           
                           | LDM -- Note that there are three different forms
                           | STM -- Note that there are two different forms
@@ -238,3 +316,73 @@ data ARMUnconditionalOpcode = CPS
                             | SRS
                             | BLXUC Int32 -- unconditional BLX
   deriving (Show, Read, Eq)
+
+cond :: a -> a -> Bool -> a
+cond f t False = f
+cond f t True  = t
+
+swp :: Bool -> ARMRegister -> ARMRegister -> ARMRegister -> ARMConditionalOpcode
+swp False = undefined
+swp True = undefined
+
+and = cond AND ANDS
+eor = cond EOR EORS
+sub = cond SUB SUBS
+rsb = cond RSB RSBS
+add = cond ADD ADDS
+adc = cond ADC ADCS
+sbc = cond SBC SBCS
+rsc = cond RSC RSCS
+
+smuad  = cond SMUAD SMUADX
+smusd  = cond SMUSD SMUSDX
+smlad  = cond SMLAD SMLADX
+smlald = cond SMLALD SMLALDX
+smlsd  = cond SMLSD SMLSDX
+smlsld = cond SMLSLD SMLSLDX
+
+orr = cond ORR ORRS
+mov = cond MOV MOVS
+lsl = cond LSL LSLS
+lsr = cond LSR LSRS
+asr = cond ASR ASRS
+rrx = cond RRX RRXS
+ror = cond ROR RORS
+bic = cond BIC BICS
+mvn = cond MVN MVNS
+
+
+smmla = cond SMMLA SMMLAR
+smmul = cond SMMUL SMMULR
+smmls = cond SMMLS SMMLSR
+
+mul = cond MUL MULS
+mla = cond MLA MLAS
+
+umlal = cond UMLAL UMLALS
+umull = cond UMULL UMULLS
+
+smlal = cond SMLAL SMLALS
+smull = cond SMULL SMULLS
+
+ldr :: Width -> Bool -> Bool -> ARMRegister -> ARMOpMemory -> ARMConditionalOpcode
+ldr Byte       False  False = LDRB 
+ldr Byte       False  True  = LDRSB 
+ldr Byte       True   False = LDRBT
+ldr HalfWord   False  False = LDRH
+ldr HalfWord   False  True  = LDRH
+ldr HalfWord   True   False = LDRHT
+ldr Word       False  False = LDR
+ldr Word       True   False = LDRT
+ldr DoubleWord False  False = LDRD
+ldr _ _ _ = error "invalid combination of LDR flags"
+
+str :: Width -> Bool -> ARMRegister -> ARMOpMemory -> ARMConditionalOpcode
+str Byte       False  = STRB 
+str Byte       True   = STRBT
+str HalfWord   False  = STRH
+str HalfWord   True   = STRHT
+str Word       False  = STR
+str Word       True   = STRT
+str DoubleWord False  = STRD
+str _ _ = error "invalid combination of STR flags"

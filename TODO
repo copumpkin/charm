@@ -1,0 +1,1 @@
+Currently using ((->) r) monad for all instruction field parsing. This works fine, but only goes one way. If we want to generate ARM code someday (does the decoding structure even have enough information to do so?) we're going to need something that allows us to preserve the information for reconstruction.
