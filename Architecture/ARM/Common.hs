@@ -38,17 +38,17 @@ data ARMRegister = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8
 data ARMShift = S_LSL | S_LSR | S_ASR | S_ROR
   deriving (Show, Read, Eq, Enum)
 
-data ARMCondition = C_EQ | C_NE | C_CS | C_CC | C_MI | C_PL | C_VS | C_VC
-                  | C_HI | C_LS | C_GE | C_LT | C_GT | C_LE | C_AL | C_UND
+data ARMCondition = EQ | NE | CS | CC | MI | PL | VS | VC
+                  | HI | LS | GE | LT | GT | LE | AL | UND
   deriving (Show, Read, Eq, Enum)
 
 data ARMStatusRegister = CPSR | SPSR
   deriving (Show, Read, Eq, Enum)
 
-data ARMEndian = BE | LE
+data ARMEndian = Big | Little
   deriving (Show, Read, Eq, Enum)
 
-data Nybble = T | B
+data Nybble = High | Low
   deriving (Show, Read, Eq, Enum)
 
 data Width = Byte | HalfWord | Word | DoubleWord
