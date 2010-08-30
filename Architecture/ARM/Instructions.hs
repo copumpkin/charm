@@ -348,7 +348,7 @@ data Unconditional = CPS Word32
                    | SRSIB Bool ARMRegister Word32 -- the register is always SP/R13
                    
                    | CLREX
-                   | BLXUC Int32 -- unconditional BLX
+                   | BLXUC Int32 -- unconditional BLX (maybe make this Word32 -> Int32? since it relies on the current PC, or otherwise just treat the Int32 as a relative jump)
   deriving (Show, Read, Eq)
 
 cond :: a -> a -> Bool -> a
