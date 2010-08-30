@@ -230,6 +230,8 @@ data ARMConditionalOpcode = B Bool Int32 -- B, BL
                           | UXTB ARMRegister ARMOpData -- rotate -- NEW
                           | UXTH ARMRegister ARMOpData -- rotate -- NEW
 
+                          | UBFX ARMRegister ARMRegister Word32 Word32
+                          | SBFX ARMRegister ARMRegister Word32 Word32
                           
                           | CLZ ARMRegister ARMRegister
                           | USAD8 ARMRegister ARMRegister ARMRegister 
@@ -246,7 +248,7 @@ data ARMConditionalOpcode = B Bool Int32 -- B, BL
                           | USAT16 ARMRegister Word8 ARMRegister
                           
                           | MRS ARMRegister ARMStatusRegister
-                          | MSR 
+                          | MSR Bool Bool ARMOpData -- FIXME: always immediate, we should fix this. make the o parser's internals reusable
                           
                           | LDR  ARMRegister ARMOpMemory 
                           | LDRB ARMRegister ARMOpMemory 
@@ -328,10 +330,20 @@ data ARMUnconditionalOpcode = CPS Word32
                             | CPSIE Bool Bool Bool (Maybe Word32)
                             | CPSID Bool Bool Bool (Maybe Word32)
                             | SETEND ARMEndian
-                            | RFE
+                            
+                            | RFE   Bool ARMRegister
+                            | RFEDA Bool ARMRegister
+                            | RFEDB Bool ARMRegister
+                            | RFEIB Bool ARMRegister
+                            
                             | BKPT Word8
                             | PLD ARMOpMemory
-                            | SRS
+                            
+                            | SRS   Bool ARMRegister Word32 -- the register is always SP/R13
+                            | SRSDA Bool ARMRegister Word32 -- the register is always SP/R13
+                            | SRSDB Bool ARMRegister Word32 -- the register is always SP/R13
+                            | SRSIB Bool ARMRegister Word32 -- the register is always SP/R13
+                            
                             | CLREX
                             | BLXUC Int32 -- unconditional BLX
   deriving (Show, Read, Eq)
@@ -404,16 +416,24 @@ str Word       True   = STRT
 str DoubleWord False  = STRD
 str _ _ = error "invalid combination of STR flags"
 
-ldm :: ARMMultipleDirection -> ARMMultipleOrder -> Bool -> ARMRegister -> ARMOpMultiple -> ARMConditionalOpcode
 ldm Decrement After  = LDMDA
 ldm Decrement Before = LDMDB
 ldm Increment After  = LDM
 ldm Increment Before = LDMIB
 
-stm :: ARMMultipleDirection -> ARMMultipleOrder -> Bool -> ARMRegister -> ARMOpMultiple -> ARMConditionalOpcode
 stm Decrement After  = STMDA
 stm Decrement Before = STMDB
 stm Increment After  = STM
 stm Increment Before = STMIB
+
+rfe Decrement After  = RFEDA
+rfe Decrement Before = RFEDB
+rfe Increment After  = RFE
+rfe Increment Before = RFEIB
+
+srs Decrement After  = SRSDA
+srs Decrement Before = SRSDB
+srs Increment After  = SRS
+srs Increment Before = SRSIB
 
 swp = cond SWP SWPB

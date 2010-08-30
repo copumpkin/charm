@@ -55,8 +55,8 @@ data Width = Byte | HalfWord | Word | DoubleWord
 data ARMHint = SY | UN | ST | UNST | UK Word32 -- FIXME: should really prefix these consistently
   deriving (Show, Read, Eq)
 
-data ARMMultipleDirection = Decrement | Increment
+data ARMDirection = Decrement | Increment
   deriving (Show, Read, Eq, Enum)
   
-data ARMMultipleOrder = Before | After
+data ARMOrder = Before | After
   deriving (Show, Read, Eq, Enum)
