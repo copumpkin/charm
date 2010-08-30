@@ -172,48 +172,48 @@ data ARMConditionalOpcode = B Bool Int32 -- B, BL
                           | QADD ARMRegister ARMRegister ARMRegister
                           | QADD16 ARMRegister ARMRegister ARMRegister
                           | QADD8 ARMRegister ARMRegister ARMRegister
-                          | QADDSUBX ARMRegister ARMRegister ARMRegister
+                          | QASX ARMRegister ARMRegister ARMRegister
                           | QDADD ARMRegister ARMRegister ARMRegister
                           | QDSUB ARMRegister ARMRegister ARMRegister
                           | QSUB ARMRegister ARMRegister ARMRegister
                           | QSUB16 ARMRegister ARMRegister ARMRegister
                           | QSUB8 ARMRegister ARMRegister ARMRegister
-                          | QSUBADDX ARMRegister ARMRegister ARMRegister
+                          | QSAX ARMRegister ARMRegister ARMRegister
                           
                           | SADD16 ARMRegister ARMRegister ARMRegister
                           | SADD8 ARMRegister ARMRegister ARMRegister
-                          | SADDSUBX ARMRegister ARMRegister ARMRegister
+                          | SASX ARMRegister ARMRegister ARMRegister
                           | SSUB16 ARMRegister ARMRegister ARMRegister
                           | SSUB8 ARMRegister ARMRegister ARMRegister
-                          | SSUBADDX ARMRegister ARMRegister ARMRegister
+                          | SSAX ARMRegister ARMRegister ARMRegister
                           
                           | SHADD16 ARMRegister ARMRegister ARMRegister
                           | SHADD8 ARMRegister ARMRegister ARMRegister
-                          | SHADDSUBX ARMRegister ARMRegister ARMRegister
+                          | SHASX ARMRegister ARMRegister ARMRegister
                           | SHSUB16 ARMRegister ARMRegister ARMRegister
                           | SHSUB8 ARMRegister ARMRegister ARMRegister
-                          | SHSUBADDX ARMRegister ARMRegister ARMRegister
+                          | SHSAX ARMRegister ARMRegister ARMRegister
                           
                           | UADD16 ARMRegister ARMRegister ARMRegister
                           | UADD8 ARMRegister ARMRegister ARMRegister
-                          | UADDSUBX ARMRegister ARMRegister ARMRegister
+                          | UASX ARMRegister ARMRegister ARMRegister
                           | USUB16 ARMRegister ARMRegister ARMRegister
                           | USUB8 ARMRegister ARMRegister ARMRegister
-                          | USUBADDX ARMRegister ARMRegister ARMRegister
+                          | USAX ARMRegister ARMRegister ARMRegister
                           
                           | UHADD16 ARMRegister ARMRegister ARMRegister
                           | UHADD8 ARMRegister ARMRegister ARMRegister
-                          | UHADDSUBX ARMRegister ARMRegister ARMRegister
+                          | UHASX ARMRegister ARMRegister ARMRegister
                           | UHSUB16 ARMRegister ARMRegister ARMRegister
                           | UHSUB8 ARMRegister ARMRegister ARMRegister
-                          | UHSUBADDX ARMRegister ARMRegister ARMRegister
+                          | UHSAX ARMRegister ARMRegister ARMRegister
                           
                           | UQADD16 ARMRegister ARMRegister ARMRegister
                           | UQADD8 ARMRegister ARMRegister ARMRegister
-                          | UQADDSUBX ARMRegister ARMRegister ARMRegister
+                          | UQASX ARMRegister ARMRegister ARMRegister
                           | UQSUB16 ARMRegister ARMRegister ARMRegister
                           | UQSUB8 ARMRegister ARMRegister ARMRegister
-                          | UQSUBADDX ARMRegister ARMRegister ARMRegister
+                          | UQSAX ARMRegister ARMRegister ARMRegister
                           
                           | SXTAB16 ARMRegister ARMRegister ARMOpData -- rotate
                           | SXTAB ARMRegister ARMRegister ARMOpData -- rotate
@@ -272,20 +272,34 @@ data ARMConditionalOpcode = B Bool Int32 -- B, BL
 
 
 
-                          | LDREX ARMRegister ARMRegister ARMOpMemory
-                          | STREX ARMRegister ARMRegister ARMOpMemory
-                          | STREXD ARMRegister ARMRegister ARMRegister ARMOpMemory                          
-                          
-                          | LDM -- Note that there are three different forms
-                          | STM -- Note that there are two different forms
+                          | LDREX  ARMRegister ARMOpMemory
+                          | LDREXB ARMRegister ARMOpMemory
+                          | LDREXH ARMRegister ARMOpMemory
+                          | LDREXD ARMRegister ARMRegister ARMOpMemory
+
+                          | STREX  ARMRegister ARMRegister ARMOpMemory
+                          | STREXB ARMRegister ARMRegister ARMOpMemory
+                          | STREXH ARMRegister ARMRegister ARMOpMemory
+                          | STREXD ARMRegister ARMRegister ARMRegister ARMOpMemory
+                                                    
+                          | LDM   Bool ARMRegister ARMOpMultiple -- == LDMIA /LDMFD
+                          | LDMDA Bool ARMRegister ARMOpMultiple -- == LDMFA
+                          | LDMDB Bool ARMRegister ARMOpMultiple -- == LDMEA
+                          | LDMIB Bool ARMRegister ARMOpMultiple -- == LDMED
+
+                          | STM   Bool ARMRegister ARMOpMultiple -- == STMIA / STMFD
+                          | STMDA Bool ARMRegister ARMOpMultiple -- == STMFA
+                          | STMDB Bool ARMRegister ARMOpMultiple -- == STMEA
+                          | STMIB Bool ARMRegister ARMOpMultiple -- == STMED
+
                           | PUSH ARMOpMultiple
                           | POP ARMOpMultiple
                           
-                          | SWP Bool ARMRegister ARMRegister ARMRegister -- SWP, SWPB
-                          | SWPB Bool ARMRegister ARMRegister ARMRegister -- NEW
+                          | SWP ARMRegister ARMRegister ARMOpMemory -- Last reg is actually a memory offset
+                          | SWPB ARMRegister ARMRegister ARMOpMemory -- Last reg is actually a memory offset
 
-                          
-                          | SWI Word32
+                          | SMC Word32
+                          | SVC Word32
                           
                           | DBG Word32
                           | DMB ARMHint
@@ -306,14 +320,19 @@ data ARMConditionalOpcode = B Bool Int32 -- B, BL
                           | MOVW ARMRegister Word32
                           | MOVT ARMRegister Word32
                           | RBIT ARMRegister ARMRegister
+                          
+                          | NOP 
   deriving (Show, Read, Eq)
 
-data ARMUnconditionalOpcode = CPS
+data ARMUnconditionalOpcode = CPS Word32
+                            | CPSIE Bool Bool Bool (Maybe Word32)
+                            | CPSID Bool Bool Bool (Maybe Word32)
                             | SETEND ARMEndian
                             | RFE
                             | BKPT Word8
                             | PLD ARMOpMemory
                             | SRS
+                            | CLREX
                             | BLXUC Int32 -- unconditional BLX
   deriving (Show, Read, Eq)
 
@@ -321,9 +340,7 @@ cond :: a -> a -> Bool -> a
 cond f t False = f
 cond f t True  = t
 
-swp :: Bool -> ARMRegister -> ARMRegister -> ARMRegister -> ARMConditionalOpcode
-swp False = undefined
-swp True = undefined
+
 
 and = cond AND ANDS
 eor = cond EOR EORS
@@ -386,3 +403,17 @@ str Word       False  = STR
 str Word       True   = STRT
 str DoubleWord False  = STRD
 str _ _ = error "invalid combination of STR flags"
+
+ldm :: ARMMultipleDirection -> ARMMultipleOrder -> Bool -> ARMRegister -> ARMOpMultiple -> ARMConditionalOpcode
+ldm Decrement After  = LDMDA
+ldm Decrement Before = LDMDB
+ldm Increment After  = LDM
+ldm Increment Before = LDMIB
+
+stm :: ARMMultipleDirection -> ARMMultipleOrder -> Bool -> ARMRegister -> ARMOpMultiple -> ARMConditionalOpcode
+stm Decrement After  = STMDA
+stm Decrement Before = STMDB
+stm Increment After  = STM
+stm Increment Before = STMIB
+
+swp = cond SWP SWPB

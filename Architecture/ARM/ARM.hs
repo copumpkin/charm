@@ -90,8 +90,8 @@ arm_b i = ((((fromIntegral i :: Int32) .&. 0xffffff) `xor` 0x800000) - 0x800000)
 arm_c :: ARMDecoder ARMCondition
 arm_c i = toEnum $ fromIntegral ((i `shiftR` 28) .&. 0xf)
 
-arm_m :: ARMDecoder ARMOpMultiple
-arm_m i = Regs . catMaybes $ map (\x -> if i .&. (1 `shiftL` x) /= 0 then Just $ toEnum x else Nothing) [0..15]
+arm_m :: ARMDecoder [ARMRegister]
+arm_m i = catMaybes $ map (\x -> if i .&. (1 `shiftL` x) /= 0 then Just $ toEnum x else Nothing) [0..15]
 
 arm_o :: ARMDecoder ARMOpData
 arm_o i | i .&. 0x2000000 /= 0 = Imm . fromIntegral $ (i .&. 0xff) `rotateR` (((fromIntegral i) .&. 0xf00) `shiftR` 7)
@@ -190,14 +190,15 @@ reg12_reg16_reg0_reg8 f = reg12_reg16_reg0 f <*> reg 8
 reg16_reg0_reg8 f = f <$> reg 16 <*> reg 0 <*> reg 8
 reg16_reg0_reg8_reg12 f = reg16_reg0_reg8 f <*> reg 12
 
+arm_maybe b f x = if bool b x then Just (f x) else Nothing
+
 bool20_reg12_reg16_o f = f <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o
 
 armOpcodes = 
-  [ --ARMOpcode32 [ARM_EXT_V1] 0xe1a00000 0xffffffff [arm_const "nop"]
-    ARMOpcode32 [ARM_EXT_V4T, ARM_EXT_V5] 0x012FFF10 0x0ffffff0 (arm_cond $ BX <$> (reg 0))
+  [ ARMOpcode32 [ARM_EXT_V4T, ARM_EXT_V5] 0x012FFF10 0x0ffffff0 (arm_cond $ BX <$> (reg 0))
   , ARMOpcode32 [ARM_EXT_V2]    0x00000090 0x0fe000f0 (arm_cond $ mul <$> bool 20 <*> reg 16 <*> reg 0 <*> reg 8)
   , ARMOpcode32 [ARM_EXT_V2]    0x00200090 0x0fe000f0 (arm_cond $ mla <$> bool 20 <*> reg 16 <*> reg 0 <*> reg 8 <*> reg 12)
---, ARMOpcode32 [ARM_EXT_V2S]   0x01000090 0x0fb00ff0 [arm_const "swp", arm_char1 22 22 'b', arm_c, reg 12, reg 0, arm_square (reg 16)]
+  , ARMOpcode32 [ARM_EXT_V2S]   0x01000090 0x0fb00ff0 (arm_cond $ swp <$> bool 22 <*> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False)) -- [arm_const "swp", arm_char1 22 22 'b', arm_c, reg 12, reg 0, arm_square (reg 16)]
   , ARMOpcode32 [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (arm_cond $ (arm_arr 22 22 [smull, umull]) <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
   , ARMOpcode32 [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (arm_cond $ (arm_arr 22 22 [smlal, umlal]) <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
   , ARMOpcode32 [ARM_EXT_V7]    0xf450f000 0xfd70f000 (arm_cond $ PLI <$> arm_P)
@@ -214,65 +215,65 @@ armOpcodes =
   , ARMOpcode32 [ARM_EXT_V6T2]  0x03400000 0x0ff00000 (arm_cond $ MOVT <$> reg 12 <*> arm_V)
   , ARMOpcode32 [ARM_EXT_V6T2]  0x06ff0f30 0x0fff0ff0 (arm_cond $ RBIT <$> reg 12 <*> reg 0)
 --, ARMOpcode32 [ARM_EXT_V6T2]  0x07a00050 0x0fa00070 [arm_arr 22 22 ['u', 's'], arm_const "bfx", arm_c, reg 12, reg 0, arm_d 7 11, arm_W 16 20]
---, ARMOpcode32 [ARM_EXT_V6Z]   0x01600070 0x0ff000f0 [arm_const "smc", arm_c, arm_e]
---, ARMOpcode32 [ARM_EXT_V6K]   0xf57ff01f 0xffffffff [arm_const "clrex"]
---, ARMOpcode32 [ARM_EXT_V6K]   0x01d00f9f 0x0ff00fff [arm_const "ldrexb", arm_c, reg 12, arm_square (reg 16)]
---, ARMOpcode32 [ARM_EXT_V6K]   0x01b00f9f 0x0ff00fff [arm_const "ldrexd", arm_c, reg 12, arm_square (reg 16)] 
---, ARMOpcode32 [ARM_EXT_V6K]   0x01f00f9f 0x0ff00fff [arm_const "ldrexh", arm_c, reg 12, arm_square (reg 16)] 
---, ARMOpcode32 [ARM_EXT_V6K]   0x01c00f90 0x0ff00ff0 [arm_const "strexb", arm_c, reg 12, reg 0, arm_square (reg 16)]
---, ARMOpcode32 [ARM_EXT_V6K]   0x01a00f90 0x0ff00ff0 [arm_const "strexd", arm_c, reg 12, reg 0, arm_square (reg 16)] 
---, ARMOpcode32 [ARM_EXT_V6K]   0x01e00f90 0x0ff00ff0 [arm_const "strexh", arm_c, reg 12, reg 0, arm_square (reg 16)] 
+  , ARMOpcode32 [ARM_EXT_V6Z]   0x01600070 0x0ff000f0 (arm_cond $ SMC <$> arm_e)
+  , ARMOpcode32 [ARM_EXT_V6K]   0xf57ff01f 0xffffffff (arm_uncond $ pure CLREX) 
+  , ARMOpcode32 [ARM_EXT_V6K]   0x01d00f9f 0x0ff00fff (arm_cond $ LDREXB <$> reg 12 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False))
+  , ARMOpcode32 [ARM_EXT_V6K]   0x01b00f9f 0x0ff00fff (arm_cond $ do rt <- reg 12; rn <- reg 16; return (LDREXD rt (succ rt) (MemReg rn (Imm 0) False)))
+  , ARMOpcode32 [ARM_EXT_V6K]   0x01f00f9f 0x0ff00fff (arm_cond $ LDREXH <$> reg 12 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False))
+  , ARMOpcode32 [ARM_EXT_V6K]   0x01c00f90 0x0ff00ff0 (arm_cond $ STREXB <$> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False))
+  , ARMOpcode32 [ARM_EXT_V6K]   0x01a00f90 0x0ff00ff0 (arm_cond $ do rd <- reg 12; rn <- reg 16; rt <- reg 0; return (STREXD rd rt (succ rt) (MemReg rn (Imm 0) False)))
+  , ARMOpcode32 [ARM_EXT_V6K]   0x01e00f90 0x0ff00ff0 (arm_cond $ STREXH <$> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False))
   , ARMOpcode32 [ARM_EXT_V6K]   0x0320f001 0x0fffffff (arm_cond $ pure YIELD)
   , ARMOpcode32 [ARM_EXT_V6K]   0x0320f002 0x0fffffff (arm_cond $ pure WFE)
   , ARMOpcode32 [ARM_EXT_V6K]   0x0320f003 0x0fffffff (arm_cond $ pure WFI)
   , ARMOpcode32 [ARM_EXT_V6K]   0x0320f004 0x0fffffff (arm_cond $ pure SEV)
---, ARMOpcode32 [ARM_EXT_V6K]   0x0320f000 0x0fffff00 [arm_const "nop", arm_c, arm_curly (arm_d 0 7)]
---, ARMOpcode32 [ARM_EXT_V6]    0xf1080000 0xfffffe3f [arm_const "cpsie", arm_char1 8 8 'a', arm_char1 7 7 'i', arm_char1 6 6 'f']
---, ARMOpcode32 [ARM_EXT_V6]    0xf10a0000 0xfffffe20 [arm_const "cpsie", arm_char1 8 8 'a', arm_char1 7 7 'i', arm_char1 6 6 'f', arm_d 0 4] 
---, ARMOpcode32 [ARM_EXT_V6]    0xf10C0000 0xfffffe3f [arm_const "cpsid", arm_char1 8 8 'a', arm_char1 7 7 'i', arm_char1 6 6 'f'] 
---, ARMOpcode32 [ARM_EXT_V6]    0xf10e0000 0xfffffe20 [arm_const "cpsid", arm_char1 8 8 'a', arm_char1 7 7 'i', arm_char1 6 6 'f', arm_d 0 4] 
---, ARMOpcode32 [ARM_EXT_V6]    0xf1000000 0xfff1fe20 [arm_const "cps", arm_d 0 4]
+  , ARMOpcode32 [ARM_EXT_V6K]   0x0320f000 0x0fffff00 (arm_cond $ pure NOP)
+  , ARMOpcode32 [ARM_EXT_V6]    0xf1080000 0xfffffe3f (arm_uncond $ CPSIE <$> bool 8 <*> bool 7 <*> bool 6 <*> pure Nothing)
+  , ARMOpcode32 [ARM_EXT_V6]    0xf10a0000 0xfffffe20 (arm_uncond $ CPSIE <$> bool 8 <*> bool 7 <*> bool 6 <*> (Just <$> arm_d 0 4))
+  , ARMOpcode32 [ARM_EXT_V6]    0xf10C0000 0xfffffe3f (arm_uncond $ CPSID <$> bool 8 <*> bool 7 <*> bool 6 <*> pure Nothing)
+  , ARMOpcode32 [ARM_EXT_V6]    0xf10e0000 0xfffffe20 (arm_uncond $ CPSID <$> bool 8 <*> bool 7 <*> bool 6 <*> (Just <$> arm_d 0 4))
+  , ARMOpcode32 [ARM_EXT_V6]    0xf1000000 0xfff1fe20 (arm_uncond $ CPS <$> arm_d 0 4)
   , ARMOpcode32 [ARM_EXT_V6]    0x06800010 0x0ff00ff0 (arm_cond $ PKHBT <$> reg 12 <*> reg 16 <*> (Reg <$> reg 0))
   , ARMOpcode32 [ARM_EXT_V6]    0x06800010 0x0ff00070 (arm_cond $ PKHBT <$> reg 12 <*> reg 16 <*> (RegShiftImm S_LSL <$> arm_d 7 11 <*> reg 0))
   , ARMOpcode32 [ARM_EXT_V6]    0x06800050 0x0ff00ff0 (arm_cond $ PKHTB <$> reg 12 <*> reg 16 <*> (RegShiftImm S_ASR 32 <$> reg 0))
   , ARMOpcode32 [ARM_EXT_V6]    0x06800050 0x0ff00070 (arm_cond $ PKHTB <$> reg 12 <*> reg 16 <*> (RegShiftImm S_ASR <$> arm_d 7 11 <*> reg 0))
---, ARMOpcode32 [ARM_EXT_V6]    0x01900f9f 0x0ff00fff (arm_cond . reg12_reg16_reg0 $ LDREX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x01900f9f 0x0ff00fff (arm_cond $ LDREX  <$> reg 12 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False) )
   , ARMOpcode32 [ARM_EXT_V6]    0x06200f10 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ QADD16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06200f90 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ QADD8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06200f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ QADDSUBX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x06200f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ QASX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06200f70 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ QSUB16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06200ff0 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ QSUB8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06200f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ QSUBADDX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x06200f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ QSAX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06100f10 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SADD16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06100f90 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SADD8)
---, ARMOpcode32 [ARM_EXT_V6]    0x06100f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SADDADDX) -- http://sourceware.org/bugzilla/show_bug.cgi?id=6773
+  , ARMOpcode32 [ARM_EXT_V6]    0x06100f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SASX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06300f10 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SHADD16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06300f90 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SHADD8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06300f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SHADDSUBX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x06300f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SHASX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06300f70 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SHSUB16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06300ff0 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SHSUB8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06300f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SHSUBADDX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x06300f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SHSAX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06100f70 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SSUB16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06100ff0 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SSUB8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06100f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SSUBADDX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x06100f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ SSAX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06500f10 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UADD16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06500f90 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UADD8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06500f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UADDSUBX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x06500f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UASX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06700f10 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UHADD16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06700f90 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UHADD8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06700f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UHADDSUBX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x06700f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UHASX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06700f70 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UHSUB16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06700ff0 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UHSUB8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06700f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UHSUBADDX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x06700f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UHSAX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06600f10 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UQADD16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06600f90 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UQADD8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06600f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UQADDSUBX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x06600f30 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UQASX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06600f70 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UQSUB16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06600ff0 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UQSUB8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06600f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UQSUBADDX)
+  , ARMOpcode32 [ARM_EXT_V6]    0x06600f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ UQSAX)
   , ARMOpcode32 [ARM_EXT_V6]    0x06500f70 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ USUB16)
   , ARMOpcode32 [ARM_EXT_V6]    0x06500ff0 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ USUB8)
-  , ARMOpcode32 [ARM_EXT_V6]    0x06500f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ USUBADDX) 
+  , ARMOpcode32 [ARM_EXT_V6]    0x06500f50 0x0ff00ff0 (arm_cond . reg12_reg16_reg0 $ USAX) 
   , ARMOpcode32 [ARM_EXT_V6]    0x06bf0f30 0x0fff0ff0 (arm_cond $ REV     <$> reg 12 <*> reg 0)
   , ARMOpcode32 [ARM_EXT_V6]    0x06bf0fb0 0x0fff0ff0 (arm_cond $ REV16   <$> reg 12 <*> reg 0)
   , ARMOpcode32 [ARM_EXT_V6]    0x06ff0fb0 0x0fff0ff0 (arm_cond $ REVSH   <$> reg 12 <*> reg 0)
@@ -386,7 +387,7 @@ armOpcodes =
   , ARMOpcode32 [ARM_EXT_V1]    0x00c00000 0x0de00000 (arm_cond . bool20_reg12_reg16_o $ sbc)
   , ARMOpcode32 [ARM_EXT_V1]    0x00e00000 0x0de00000 (arm_cond . bool20_reg12_reg16_o $ rsc)
 --, ARMOpcode32 [ARM_EXT_V3]    0x0120f000 0x0db0f000 (arm_cond $ MSR <$> arm_arr 22 22 [SPSR, CPSR] <*> arm_C <*> arm_o)
---, ARMOpcode32 [ARM_EXT_V3]    0x010f0000 0x0fbf0fff (arm_cond $ MRS <$> reg 12 <*> arm_arr 22 22 [SPSR, CPSR]))
+  , ARMOpcode32 [ARM_EXT_V3]    0x010f0000 0x0fbf0fff (arm_cond $ MRS <$> reg 12 <*> arm_arr 22 22 [SPSR, CPSR])
   , ARMOpcode32 [ARM_EXT_V1]    0x01000000 0x0de00000 (arm_cond $ TST <$> {-arm_p <*>-} reg 16 <*> arm_o)
   , ARMOpcode32 [ARM_EXT_V1]    0x01200000 0x0de00000 (arm_cond $ TEQ <$> {-arm_p <*>-} reg 16 <*> arm_o)
   , ARMOpcode32 [ARM_EXT_V1]    0x01400000 0x0de00000 (arm_cond $ CMP <$> {-arm_p <*>-} reg 16 <*> arm_o)
@@ -410,15 +411,15 @@ armOpcodes =
   , ARMOpcode32 [ARM_EXT_V1]    0x06000010 0x0e000010 (pure ARMUndefined)
   , ARMOpcode32 [ARM_EXT_V1]    0x049d0004 0x0fff0fff (arm_cond $ LDRH <$> reg 12 <*> arm_a)
   , ARMOpcode32 [ARM_EXT_V1]    0x04100000 0x0c100000 (arm_cond $ ldr <$> arm_bw 22 <*> arm_t <*> pure False <*> reg 12 <*> arm_a)
-  , ARMOpcode32 [ARM_EXT_V1]    0x092d0000 0x0fff0000 (arm_cond $ PUSH <$> arm_m)
---, ARMOpcode32 [ARM_EXT_V1]    0x08800000 0x0ff00000 [arm_const "stm", arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
---, ARMOpcode32 [ARM_EXT_V1]    0x08000000 0x0e100000 [arm_const "stm", arm_arr 23 23 ['i', 'd'], arm_arr 24 24 ['b', 'a'], arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
-  , ARMOpcode32 [ARM_EXT_V1]    0x08bd0000 0x0fff0000 (arm_cond $ POP <$> arm_m)
---, ARMOpcode32 [ARM_EXT_V1]    0x08900000 0x0f900000 [arm_const "ldm", arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
---, ARMOpcode32 [ARM_EXT_V1]    0x08100000 0x0e100000 [arm_const "ldm", arm_arr 23 23 ['i', 'd'], arm_arr 24 24 ['b', 'a'], arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
+  , ARMOpcode32 [ARM_EXT_V1]    0x092d0000 0x0fff0000 (arm_cond $ PUSH <$> (Regs <$> arm_m))
+  , ARMOpcode32 [ARM_EXT_V1]    0x08800000 0x0ff00000 (arm_cond $ STM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m)) -- [arm_const "stm", arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
+  , ARMOpcode32 [ARM_EXT_V1]    0x08000000 0x0e100000 (arm_cond $ ldm <$> arm_arr 23 23 [Increment, Decrement] <*> arm_arr 24 24 [Before, After] <*> bool 21 <*> reg 16 <*> (arm_arr 22 22 [Regs, RegsCaret] <*> arm_m)) -- [arm_const "stm", arm_arr 23 23 ['i', 'd'], arm_arr 24 24 ['b', 'a'], arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
+  , ARMOpcode32 [ARM_EXT_V1]    0x08bd0000 0x0fff0000 (arm_cond $ POP <$> (Regs <$> arm_m))
+  , ARMOpcode32 [ARM_EXT_V1]    0x08900000 0x0f900000 (arm_cond $ LDM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m)) --[arm_const "ldm", arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
+  , ARMOpcode32 [ARM_EXT_V1]    0x08100000 0x0e100000 (arm_cond $ ldm <$> arm_arr 23 23 [Increment, Decrement] <*> arm_arr 24 24 [Before, After] <*> bool 21 <*> reg 16 <*> (arm_arr 22 22 [Regs, RegsCaret] <*> arm_m)) --[arm_const "ldm", arm_arr 23 23 ['i', 'd'], arm_arr 24 24 ['b', 'a'], arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
   , ARMOpcode32 [ARM_EXT_V1]    0x0a000000 0x0e000000 (arm_cond $ B <$> bool 24 <*> arm_b)
---, ARMOpcode32 [ARM_EXT_V1]    0x0f000000 0x0f000000 [arm_const "svc", arm_c, arm_x 0 23] -- does this belong?
---, ARMOpcode32 [ARM_EXT_V1]    0x00000000 0x00000000 [arm_const "undefined instruction", arm_x 0 31]  
+  , ARMOpcode32 [ARM_EXT_V1]    0x0f000000 0x0f000000 (arm_cond $ SVC <$> arm_x 0 23)
+  , ARMOpcode32 [ARM_EXT_V1]    0x00000000 0x00000000 (pure ARMUndefined)
   ]
 
 armOpcodeMatches :: Word32 -> ARMOpcode32 -> Bool
