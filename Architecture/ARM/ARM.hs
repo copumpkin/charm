@@ -418,11 +418,11 @@ armOpcodes =
   , ARMOpcode32 [ARM_EXT_V1]    0x049d0004 0x0fff0fff (arm_cond $ LDRH <$> reg 12 <*> arm_a)
   , ARMOpcode32 [ARM_EXT_V1]    0x04100000 0x0c100000 (arm_cond $ ldr <$> arm_bw 22 <*> arm_t <*> pure False <*> reg 12 <*> arm_a)
   , ARMOpcode32 [ARM_EXT_V1]    0x092d0000 0x0fff0000 (arm_cond $ PUSH <$> (Regs <$> arm_m))
-  , ARMOpcode32 [ARM_EXT_V1]    0x08800000 0x0ff00000 (arm_cond $ STM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m)) -- [arm_const "stm", arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
-  , ARMOpcode32 [ARM_EXT_V1]    0x08000000 0x0e100000 (arm_cond $ ldm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (arm_arr 22 22 [Regs, RegsCaret] <*> arm_m)) -- [arm_const "stm", arm_arr 23 23 ['i', 'd'], arm_arr 24 24 ['b', 'a'], arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
+  , ARMOpcode32 [ARM_EXT_V1]    0x08800000 0x0ff00000 (arm_cond $ STM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m))
+  , ARMOpcode32 [ARM_EXT_V1]    0x08000000 0x0e100000 (arm_cond $ ldm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (arm_arr 22 22 [Regs, RegsCaret] <*> arm_m))
   , ARMOpcode32 [ARM_EXT_V1]    0x08bd0000 0x0fff0000 (arm_cond $ POP <$> (Regs <$> arm_m))
-  , ARMOpcode32 [ARM_EXT_V1]    0x08900000 0x0f900000 (arm_cond $ LDM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m)) --[arm_const "ldm", arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
-  , ARMOpcode32 [ARM_EXT_V1]    0x08100000 0x0e100000 (arm_cond $ ldm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (arm_arr 22 22 [Regs, RegsCaret] <*> arm_m)) --[arm_const "ldm", arm_arr 23 23 ['i', 'd'], arm_arr 24 24 ['b', 'a'], arm_c, reg 16, arm_char1 21 21 '!', arm_m, arm_char1 22 22 '^']
+  , ARMOpcode32 [ARM_EXT_V1]    0x08900000 0x0f900000 (arm_cond $ LDM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m))
+  , ARMOpcode32 [ARM_EXT_V1]    0x08100000 0x0e100000 (arm_cond $ ldm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (arm_arr 22 22 [Regs, RegsCaret] <*> arm_m))
   , ARMOpcode32 [ARM_EXT_V1]    0x0a000000 0x0e000000 (arm_cond $ B <$> bool 24 <*> arm_b)
   , ARMOpcode32 [ARM_EXT_V1]    0x0f000000 0x0f000000 (arm_cond $ SVC <$> arm_x 0 23)
   , ARMOpcode32 [ARM_EXT_V1]    0x00000000 0x00000000 (pure ARMUndefined)
