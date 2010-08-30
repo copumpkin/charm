@@ -182,26 +182,12 @@ arm_E i = let msb = (i .&. 0x1f0000) `shiftR` 16
 arm_V :: ARMDecoder Word32
 arm_V i = (i .&. 0xf0000) `shiftR` 4 .|. (i .&. 0xfff)
 
-{-
-arm_square :: ARMDecoder -> ARMDecoder
-arm_square d = ((("[" ++) . (++ "]")) .) . d
-
-arm_curly :: ARMDecoder -> ARMDecoder
-arm_curly d = ((("{" ++) . (++ "}")) .) . d
-
--}
-
 bit b i = bitRange b b i
 
 bool b s = bit b s == 1
 
 enum :: (Integral i, Enum a) => i -> a
-enum = enum
-
-{-}
-arm_uncond = liftM  Unconditional
-arm_cond   = liftM2 Conditional arm_c
--}
+enum = toEnum . fromIntegral
 
 arm_bw bit i = if bitRange bit bit i == 1 then Byte else Word
 arm_bh bit i = if bitRange bit bit i == 1 then Byte else HalfWord
