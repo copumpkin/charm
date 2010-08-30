@@ -36,8 +36,8 @@ data ARMRegister = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8
 data ARMShift = S_LSL | S_LSR | S_ASR | S_ROR
   deriving (Show, Read, Eq, Enum)
 
-data ARMCondition = EQ | NE | CS | CC | MI | PL | VS | VC
-                  | HI | LS | GE | LT | GT | LE | AL | UND
+data Condition = EQ | NE | CS | CC | MI | PL | VS | VC
+               | HI | LS | GE | LT | GT | LE | AL | UND
   deriving (Show, Read, Eq, Enum)
 
 data ARMStatusRegister = CPSR | SPSR
