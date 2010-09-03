@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
-module Architecture.ARM.ARM where
+module Architecture.ARM.Decoder.ARM where
 
 import Prelude hiding (and)
 

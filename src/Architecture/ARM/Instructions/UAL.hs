@@ -1,4 +1,4 @@
-module Architecture.ARM.Instructions where
+module Architecture.ARM.Instructions.UAL where
 
 import Prelude hiding (and)
 

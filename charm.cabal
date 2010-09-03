@@ -1,0 +1,40 @@
+Name:                charm
+Cabal-version:       >=1.2
+Version:             0.0.1
+Synopsis:            A reasonably complete (eventually) implementation of the ARM specification
+Homepage:            http://github.com/pumpkin/charm
+License:             BSD3
+License-file:        LICENSE
+Author:              Daniel Peebles
+Maintainer:          Daniel Peebles <pumpkingod@gmail.com>
+Category:            Architecture
+Build-type:          Simple
+-- Extra-source-files:  
+
+
+Library
+  -- Modules exported by the library.
+  Exposed-modules:     Architecture.ARM.ARM, 
+                       Architecture.ARM.Common, 
+                       Architecture.ARM.Generate, 
+                       Architecture.ARM.Instructions, 
+                       Architecture.ARM.Instructions.Semantics
+                       Architecture.ARM.Opcodes, 
+                       Architecture.ARM.Pretty, 
+                       Architecture.ARM.Semantics, 
+                       Architecture.ARM.Thumb, 
+                       Architecture.ARM.Extensions.FPA, 
+                       Architecture.ARM.Extensions.NEON, 
+                       Architecture.ARM.Extensions.VFP, 
+                       Architecture.ARM.Extensions.WMMX, 
+                       Architecture.ARM.Extensions.XScale, 
+  
+  -- Packages needed in order to build this package.
+  -- Build-depends:       
+  
+  -- Modules not exported by this package.
+  -- Other-modules:       
+  
+  -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
+  -- Build-tools:         
+  
