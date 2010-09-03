@@ -1,2 +1,5 @@
+- TESTS
 - Currently using ((->) r) monad for all instruction field parsing. This works fine, but only goes one way. If we want to generate ARM code someday (does the decoding structure even have enough information to do so?) we're going to need something that allows us to preserve the information for reconstruction.
 - Remove evil dependence on enum directions in decoding
+- The decoder polymorphism for automatically deciding what to use (for condition codes and the like) is disgusting. There's a lot of repetition and it can probably be done a lot more elegantly
+- Construct decision tree from list of decoders to upgrade our lookups from linear to logarithmic in the number of instructions per set

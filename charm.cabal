@@ -11,23 +11,21 @@ Category:            Architecture
 Build-type:          Simple
 -- Extra-source-files:  
 
-
 Library
   -- Modules exported by the library.
-  Exposed-modules:     Architecture.ARM.ARM, 
+  Exposed-modules:     Architecture.ARM, 
                        Architecture.ARM.Common, 
                        Architecture.ARM.Generate, 
-                       Architecture.ARM.Instructions, 
-                       Architecture.ARM.Instructions.Semantics
-                       Architecture.ARM.Opcodes, 
                        Architecture.ARM.Pretty, 
                        Architecture.ARM.Semantics, 
-                       Architecture.ARM.Thumb, 
-                       Architecture.ARM.Extensions.FPA, 
-                       Architecture.ARM.Extensions.NEON, 
-                       Architecture.ARM.Extensions.VFP, 
-                       Architecture.ARM.Extensions.WMMX, 
-                       Architecture.ARM.Extensions.XScale, 
+                       Architecture.ARM.Decoder.ARM, 
+                       Architecture.ARM.Decoder.Thumb, 
+                       Architecture.ARM.Instructions.UAL, 
+                       Architecture.ARM.Instructions.UAL.Semantics,
+                       Architecture.ARM.Instructions.VFP, 
+                       Architecture.ARM.Instructions.VFP.Semantics,
+                       Architecture.ARM.Instructions.NEON, 
+                       Architecture.ARM.Instructions.NEON.Semantics
   
   -- Packages needed in order to build this package.
   -- Build-depends:       

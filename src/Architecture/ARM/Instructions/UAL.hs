@@ -30,7 +30,7 @@ data ARMOpMultiple = Regs [ARMRegister]
                    | RegsCaret [ARMRegister]
   deriving (Show, Read, Eq)
 
-data ARMInstruction = Unconditional Unconditional
+data UALInstruction = Unconditional Unconditional
                     | Conditional Condition Conditional
                     | Undefined
   deriving (Show, Read, Eq)
@@ -401,22 +401,22 @@ ldr :: Width -> Bool -> Bool -> ARMRegister -> ARMOpMemory -> Conditional
 ldr Byte       False  False = LDRB 
 ldr Byte       False  True  = LDRSB 
 ldr Byte       True   False = LDRBT
-ldr HalfWord   False  False = LDRH
-ldr HalfWord   False  True  = LDRH
-ldr HalfWord   True   False = LDRHT
+ldr Halfword   False  False = LDRH
+ldr Halfword   False  True  = LDRH
+ldr Halfword   True   False = LDRHT
 ldr Word       False  False = LDR
 ldr Word       True   False = LDRT
-ldr DoubleWord False  False = LDRD
+ldr Doubleword False  False = LDRD
 ldr _ _ _ = error "invalid combination of LDR flags"
 
 str :: Width -> Bool -> ARMRegister -> ARMOpMemory -> Conditional
 str Byte       False  = STRB 
 str Byte       True   = STRBT
-str HalfWord   False  = STRH
-str HalfWord   True   = STRHT
+str Halfword   False  = STRH
+str Halfword   True   = STRHT
 str Word       False  = STR
 str Word       True   = STRT
-str DoubleWord False  = STRD
+str Doubleword False  = STRD
 str _ _ = error "invalid combination of STR flags"
 
 ldm Decrement After  = LDMDA

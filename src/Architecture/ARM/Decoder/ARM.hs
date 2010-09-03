@@ -1,10 +1,10 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, FlexibleContexts #-}
 module Architecture.ARM.Decoder.ARM where
 
 import Prelude hiding (and)
 
 import Architecture.ARM.Common
-import Architecture.ARM.Instructions
+import Architecture.ARM.Instructions.UAL
 
 import Data.Maybe
 import Data.List hiding (and)
@@ -17,45 +17,30 @@ import Text.Printf
 import Control.Monad
 import Control.Applicative
 
+type D a = Word32 -> a
 
-data ARMOpcode32 = ARMOpcode32 { opcode32_arch :: [ARMArch]
-                               , opcode32_value :: Word32
-                               , opcode32_mask :: Word32
-                               , opcode32_decoder :: ARMDecoder ARMInstruction
-                               }
-
-class Decoder a where
-  type NativeWord a :: *
-  type Structure a :: *
-  decoder :: [ARMArch] -> NativeWord a -> NativeWord a -> (NativeWord a -> a) -> Structure a
-
-instance Decoder Conditional where
-  type NativeWord Conditional = Word32
-  type Structure Conditional = ARMOpcode32
+-- This all feels horribly repetitive...
+instance Decoder Word32 Conditional where
+  type Structure Word32 Conditional = ARMDecoder Word32 UALInstruction
   
-  {-# SPECIALIZE decoder :: [ARMArch] -> Word32 -> Word32 -> (Word32 -> Conditional) -> ARMOpcode32 #-}
   decoder archs value mask d = decoder archs value mask (Conditional <$> arm_c <*> d)
 
-instance Decoder Unconditional where
-  type NativeWord Unconditional = Word32
-  type Structure Unconditional = ARMOpcode32
+instance Decoder Word32 Unconditional where
+  type Structure Word32 Unconditional = ARMDecoder Word32 UALInstruction
 
-  {-# SPECIALIZE decoder :: [ARMArch] -> Word32 -> Word32 -> (Word32 -> Unconditional) -> ARMOpcode32 #-}
   decoder archs value mask d = decoder archs value mask (Unconditional <$> d)
 
-instance Decoder ARMInstruction where
-  type NativeWord ARMInstruction = Word32
-  type Structure ARMInstruction = ARMOpcode32
+instance Decoder Word32 UALInstruction where
+  type Structure Word32 UALInstruction = ARMDecoder Word32 UALInstruction
   
-  {-# SPECIALIZE decoder :: [ARMArch] -> Word32 -> Word32 -> (Word32 -> ARMInstruction) -> ARMOpcode32 #-}
-  decoder = ARMOpcode32
+  decoder = ARMDecoder
+
 
 bitRange :: (Integral a, Bits a) => Int -> Int -> a -> a
 bitRange start end i = ((i `shiftR` start) .&. ((2 `shiftL` (end - start)) - 1))
 
-type ARMDecoder a = Word32 -> a
 
-armDecodeAddress :: ARMDecoder ARMOpMemory
+armDecodeAddress :: D ARMOpMemory
 armDecodeAddress a | (a .&. 0xf0000) == 0xf0000 && (a .&. 0x2000000) == 0 = 
                          let offset = a .&. 0xfff in
                            case a .&. 0x1000000 /= 0 of
@@ -84,17 +69,17 @@ armDecodeShift i p =  if i .&. 0xff0 /= 0 then
                           else  RegShiftImm (toEnum (((fromIntegral i) .&. 0x60) `shiftR` 5)) (toEnum (((fromIntegral i) .&. 0xf00 `shiftR` 8))) (toEnum ((fromIntegral i) .&. 0xf)) 
                         else Reg (toEnum ((fromIntegral i) .&. 0xf))
 
-arm_const :: String -> ARMDecoder String
+arm_const :: String -> D String
 arm_const x i = x
 
-arm_constint :: Int -> ARMDecoder String
+arm_constint :: Int -> D String
 arm_constint x i = show x
 
-arm_a :: ARMDecoder ARMOpMemory
+arm_a :: D ARMOpMemory
 arm_a = armDecodeAddress 
 
 -- FIXME: wow, this is pretty ugly...
-arm_s :: ARMDecoder ARMOpMemory
+arm_s :: D ARMOpMemory
 arm_s i | i .&. 0x4f0000 == 0x4f0000 = MemReg PC (Imm (fromIntegral $ (if i .&. 0x800000 == 0 then -1 else 1) * ((i .&. 0xf00) `shiftR` 4) .|. (i .&. 0xf))) False
         | i .&. 0x1000000 /= 0 = case i .&. 0x400000 of
             0x400000 -> MemReg (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) 
@@ -110,44 +95,44 @@ arm_s i | i .&. 0x4f0000 == 0x4f0000 = MemReg PC (Imm (fromIntegral $ (if i .&. 
                                False
             _        -> (if (i .&. 0x800000) == 0 then MemRegPostNeg else MemRegPost) (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) (Reg $ toEnum ((fromIntegral i) .&. 0xf))
 
-arm_b :: ARMDecoder Int32
+arm_b :: D Int32
 arm_b i = ((((fromIntegral i :: Int32) .&. 0xffffff) `xor` 0x800000) - 0x800000) * 4 + {-(fromIntegral $ pc s) + -} 8
 
-arm_c :: ARMDecoder Condition
+arm_c :: D Condition
 arm_c i = toEnum $ fromIntegral ((i `shiftR` 28) .&. 0xf)
 
-arm_m :: ARMDecoder [ARMRegister]
+arm_m :: D [ARMRegister]
 arm_m i = catMaybes $ map (\x -> if i .&. (1 `shiftL` x) /= 0 then Just $ toEnum x else Nothing) [0..15]
 
-arm_o :: ARMDecoder ARMOpData
+arm_o :: D ARMOpData
 arm_o i | i .&. 0x2000000 /= 0 = Imm . fromIntegral $ (i .&. 0xff) `rotateR` (((fromIntegral i) .&. 0xf00) `shiftR` 7)
         | otherwise = armDecodeShift i True
 
-arm_p :: ARMDecoder Bool
+arm_p :: D Bool
 arm_p i = i .&. 0xf000 == 0xf000
 
-arm_t :: ARMDecoder Bool
+arm_t :: D Bool
 arm_t i = i .&. 0x1200000 == 0x200000
 
-arm_q :: ARMDecoder ARMOpData
+arm_q :: D ARMOpData
 arm_q i = armDecodeShift i False
 
-arm_e :: ARMDecoder Word32
+arm_e :: D Word32
 arm_e i = (i .&. 0xf) .|. ((i .&. 0xfff00) `shiftR` 4)
 
-arm_B :: ARMDecoder Int32
+arm_B :: D Int32
 arm_B i = let offset = ((if i .&. 0x800000 /= 0 then 0xff else 0) + (i .&. 0xffffff)) `shiftL` 2 
               address = offset + {-(pc s) + -} 8 + (if i .&. 0x1000000 /= 0 then 2 else 0) in
                 fromIntegral address
               
 -- FIXME: this is ugly
-arm_C :: ARMDecoder String
+arm_C :: D String
 arm_C i = '_' : (if i .&. 0x80000 /= 0 then "f" else "" ++ 
                  if i .&. 0x40000 /= 0 then "s" else "" ++
                  if i .&. 0x20000 /= 0 then "x" else "" ++
                  if i .&. 0x10000 /= 0 then "c" else "")
 
-arm_U :: ARMDecoder ARMHint
+arm_U :: D ARMHint
 arm_U i = case i .&. 0xf of
             0xf -> SY
             0x7 -> UN
@@ -155,23 +140,23 @@ arm_U i = case i .&. 0xf of
             0x6 -> UNST
             x   -> UK x
 
-arm_P :: ARMDecoder ARMOpMemory
+arm_P :: D ARMOpMemory
 arm_P i = armDecodeAddress $ i .|. (1 `shiftL` 24)
 
-reg :: Int -> ARMDecoder ARMRegister
+reg :: Int -> D ARMRegister
 reg start i = toEnum (bitRange start (start + 3) $ fromIntegral i)
 
-integral :: (Integral a, Bits a) => Int -> Int -> ARMDecoder a
+integral :: (Integral a, Bits a) => Int -> Int -> D a
 integral start end i = bitRange start end $ fromIntegral i
 
-integral' :: (Integral a, Bits a) => Int -> Int -> ARMDecoder a
+integral' :: (Integral a, Bits a) => Int -> Int -> D a
 integral' start end i = (+1) . bitRange start end $ fromIntegral i
 
-arm_X :: Int -> Int -> ARMDecoder Word32
+arm_X :: Int -> Int -> D Word32
 arm_X start end i = (.&. 0xf) . bitRange start end $ i
 
 
-arm_E :: ARMDecoder (Maybe (Word32, Word32))
+arm_E :: D (Maybe (Word32, Word32))
 arm_E i = let msb = (i .&. 0x1f0000) `shiftR` 16
               lsb = (i .&. 0xf80) `shiftR` 7
               width = msb - lsb + 1 in
@@ -179,7 +164,7 @@ arm_E i = let msb = (i .&. 0x1f0000) `shiftR` 16
               Just (lsb, width) --"#" ++ (show lsb) ++ ", #" ++ (show width)
               else Nothing --"(invalid " ++ (show lsb) ++ ":" ++ (show msb) ++ ")"            
 
-arm_V :: ARMDecoder Word32
+arm_V :: D Word32
 arm_V i = (i .&. 0xf0000) `shiftR` 4 .|. (i .&. 0xfff)
 
 bit b i = bitRange b b i
@@ -190,7 +175,7 @@ enum :: (Integral i, Enum a) => i -> a
 enum = toEnum . fromIntegral
 
 arm_bw bit i = if bitRange bit bit i == 1 then Byte else Word
-arm_bh bit i = if bitRange bit bit i == 1 then Byte else HalfWord
+arm_bh bit i = if bitRange bit bit i == 1 then Byte else Halfword
 
 reg12_reg0_reg16 f = f <$> reg 12 <*> reg 0 <*> reg 16
 
@@ -199,10 +184,10 @@ reg12_reg16_reg0_reg8 f = reg12_reg16_reg0 f <*> reg 8
 reg16_reg0_reg8 f = f <$> reg 16 <*> reg 0 <*> reg 8
 reg16_reg0_reg8_reg12 f = reg16_reg0_reg8 f <*> reg 12
 
-direction :: Int -> ARMDecoder ARMDirection
+direction :: Int -> D ARMDirection
 direction n = choose n Increment Decrement
 
-order :: Int -> ARMDecoder ARMOrder
+order :: Int -> D ARMOrder
 order n = choose n Before After
 
 choose :: Int -> a -> a -> Word32 -> a
@@ -210,13 +195,15 @@ choose n t f x = if not (bool n x) then t else f
 
 bool20_reg12_reg16_o f = f <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o
 
+pure32 :: a -> D i
+pure32 = pure
 
-
+armOpcodes :: [ARMDecoder Word32 UALInstruction]
 armOpcodes = 
   [ decoder [ARM_EXT_V4T, ARM_EXT_V5] 0x012FFF10 0x0ffffff0 (BX <$> reg 0)
   , decoder [ARM_EXT_V2]    0x00000090 0x0fe000f0 (mul <$> bool 20 <*> reg 16 <*> reg 0 <*> reg 8)
   , decoder [ARM_EXT_V2]    0x00200090 0x0fe000f0 (mla <$> bool 20 <*> reg 16 <*> reg 0 <*> reg 8 <*> reg 12)
-  , decoder [ARM_EXT_V2S]   0x01000090 0x0fb00ff0 (swp <$> bool 22 <*> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False))
+  , decoder [ARM_EXT_V2S]   0x01000090 0x0fb00ff0 (swp <$> bool 22 <*> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure32 (Imm 0) <*> pure32 False))
   , decoder [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (choose 22 smull umull <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
   , decoder [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (choose 22 smlal umlal <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
 
@@ -232,7 +219,7 @@ armOpcodes =
   , decoder [ARM_EXT_V6T2]  0x006000b0 0x0f7000f0 (STRHT <$> reg 12 <*> arm_s) -- TODO: check me
 
 
-  , decoder [ARM_EXT_V6T2]  0x00300090 0x0f3000f0 (pure Undefined)
+  , decoder [ARM_EXT_V6T2]  0x00300090 0x0f3000f0 (pure32 Undefined :: Word32 -> UALInstruction)
   , decoder [ARM_EXT_V6T2]  0x00300090 0x0f300090 (ldr <$> arm_bh 5 <*> const False <*> bool 6 <*> reg 12 <*> arm_s)
 
   , decoder [ARM_EXT_V6T2]  0x03000000 0x0ff00000 (MOVW <$> reg 12 <*> arm_V)
@@ -242,23 +229,23 @@ armOpcodes =
 
   , decoder [ARM_EXT_V6Z]   0x01600070 0x0ff000f0 (SMC <$> arm_e)
 
-  , decoder [ARM_EXT_V6K]   0xf57ff01f 0xffffffff (pure CLREX) 
-  , decoder [ARM_EXT_V6K]   0x01d00f9f 0x0ff00fff (LDREXB <$> reg 12 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False))
+  , decoder [ARM_EXT_V6K]   0xf57ff01f 0xffffffff (pure32 CLREX) 
+  , decoder [ARM_EXT_V6K]   0x01d00f9f 0x0ff00fff (LDREXB <$> reg 12 <*> (MemReg <$> reg 16 <*> pure32 (Imm 0) <*> pure32 False))
   , decoder [ARM_EXT_V6K]   0x01b00f9f 0x0ff00fff (do rt <- reg 12; rn <- reg 16; return (LDREXD rt (succ rt) (MemReg rn (Imm 0) False))) -- Doesn't really need to be this compliated. We could just have the second argument be implicit (but that makes things a little uglier to work with later)
-  , decoder [ARM_EXT_V6K]   0x01f00f9f 0x0ff00fff (LDREXH <$> reg 12 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False))
-  , decoder [ARM_EXT_V6K]   0x01c00f90 0x0ff00ff0 (STREXB <$> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False))
+  , decoder [ARM_EXT_V6K]   0x01f00f9f 0x0ff00fff (LDREXH <$> reg 12 <*> (MemReg <$> reg 16 <*> pure32 (Imm 0) <*> pure32 False))
+  , decoder [ARM_EXT_V6K]   0x01c00f90 0x0ff00ff0 (STREXB <$> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure32 (Imm 0) <*> pure32 False))
   , decoder [ARM_EXT_V6K]   0x01a00f90 0x0ff00ff0 (do rd <- reg 12; rn <- reg 16; rt <- reg 0; return (STREXD rd rt (succ rt) (MemReg rn (Imm 0) False))) -- As above
-  , decoder [ARM_EXT_V6K]   0x01e00f90 0x0ff00ff0 (STREXH <$> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False))
+  , decoder [ARM_EXT_V6K]   0x01e00f90 0x0ff00ff0 (STREXH <$> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure32 (Imm 0) <*> pure32 False))
 
-  , decoder [ARM_EXT_V6K]   0x0320f001 0x0fffffff (pure YIELD)
-  , decoder [ARM_EXT_V6K]   0x0320f002 0x0fffffff (pure WFE)
-  , decoder [ARM_EXT_V6K]   0x0320f003 0x0fffffff (pure WFI)
-  , decoder [ARM_EXT_V6K]   0x0320f004 0x0fffffff (pure SEV)
-  , decoder [ARM_EXT_V6K]   0x0320f000 0x0fffff00 (pure NOP)
+  , decoder [ARM_EXT_V6K]   0x0320f001 0x0fffffff (pure32 YIELD)
+  , decoder [ARM_EXT_V6K]   0x0320f002 0x0fffffff (pure32 WFE)
+  , decoder [ARM_EXT_V6K]   0x0320f003 0x0fffffff (pure32 WFI)
+  , decoder [ARM_EXT_V6K]   0x0320f004 0x0fffffff (pure32 SEV)
+  , decoder [ARM_EXT_V6K]   0x0320f000 0x0fffff00 (pure32 NOP)
   
-  , decoder [ARM_EXT_V6]    0xf1080000 0xfffffe3f (CPSIE <$> bool 8 <*> bool 7 <*> bool 6 <*> pure Nothing)
+  , decoder [ARM_EXT_V6]    0xf1080000 0xfffffe3f (CPSIE <$> bool 8 <*> bool 7 <*> bool 6 <*> pure32 Nothing)
   , decoder [ARM_EXT_V6]    0xf10a0000 0xfffffe20 (CPSIE <$> bool 8 <*> bool 7 <*> bool 6 <*> (Just <$> integral 0 4))
-  , decoder [ARM_EXT_V6]    0xf10C0000 0xfffffe3f (CPSID <$> bool 8 <*> bool 7 <*> bool 6 <*> pure Nothing)
+  , decoder [ARM_EXT_V6]    0xf10C0000 0xfffffe3f (CPSID <$> bool 8 <*> bool 7 <*> bool 6 <*> pure32 Nothing)
   , decoder [ARM_EXT_V6]    0xf10e0000 0xfffffe20 (CPSID <$> bool 8 <*> bool 7 <*> bool 6 <*> (Just <$> integral 0 4))
   , decoder [ARM_EXT_V6]    0xf1000000 0xfff1fe20 (CPS <$> integral 0 4)
 
@@ -266,7 +253,7 @@ armOpcodes =
   , decoder [ARM_EXT_V6]    0x06800010 0x0ff00070 (PKHBT <$> reg 12 <*> reg 16 <*> (RegShiftImm S_LSL <$> integral 7 11 <*> reg 0))
   , decoder [ARM_EXT_V6]    0x06800050 0x0ff00ff0 (PKHTB <$> reg 12 <*> reg 16 <*> (RegShiftImm S_ASR 32 <$> reg 0))
   , decoder [ARM_EXT_V6]    0x06800050 0x0ff00070 (PKHTB <$> reg 12 <*> reg 16 <*> (RegShiftImm S_ASR <$> integral 7 11 <*> reg 0))
-  , decoder [ARM_EXT_V6]    0x01900f9f 0x0ff00fff (LDREX  <$> reg 12 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False) )
+  , decoder [ARM_EXT_V6]    0x01900f9f 0x0ff00fff (LDREX  <$> reg 12 <*> (MemReg <$> reg 16 <*> pure32 (Imm 0) <*> pure32 False) )
   , decoder [ARM_EXT_V6]    0x06200f10 0x0ff00ff0 (reg12_reg16_reg0 $ QADD16)
   , decoder [ARM_EXT_V6]    0x06200f90 0x0ff00ff0 (reg12_reg16_reg0 $ QADD8)
   , decoder [ARM_EXT_V6]    0x06200f30 0x0ff00ff0 (reg12_reg16_reg0 $ QASX)
@@ -356,7 +343,7 @@ armOpcodes =
   , decoder [ARM_EXT_V6]    0x06e00870 0x0ff00ff0 (UXTAB   <$> reg 12 <*> reg 16 <*> (RegShiftImm S_ROR 16 <$> reg 0))
   , decoder [ARM_EXT_V6]    0x06e00c70 0x0ff00ff0 (UXTAB   <$> reg 12 <*> reg 16 <*> (RegShiftImm S_ROR 24 <$> reg 0))
   , decoder [ARM_EXT_V6]    0x06800fb0 0x0ff00ff0 (reg12_reg16_reg0 $ SEL)
-  , decoder [ARM_EXT_V6]    0xf1010000 0xfffffc00 (SETEND <$> (enum . bit 9))
+  , decoder [ARM_EXT_V6]    0xf1010000 0xfffffc00 (SETEND <$> choose 9 Big Little)
   , decoder [ARM_EXT_V6]    0x0700f010 0x0ff0f0d0 (smuad  <$> enum . bit 5 <*> reg 16 <*> reg 0 <*> reg 8) -- TODO: double check enum direction is correct for first arg
   , decoder [ARM_EXT_V6]    0x0700f050 0x0ff0f0d0 (smusd  <$> enum . bit 5 <*> reg 16 <*> reg 0 <*> reg 8)
   , decoder [ARM_EXT_V6]    0x07000010 0x0ff000d0 (smlad  <$> enum . bit 5 <*> reg 16 <*> reg 0 <*> reg 8 <*> reg 12)
@@ -371,7 +358,7 @@ armOpcodes =
   , decoder [ARM_EXT_V6]    0x06a00010 0x0fe00070 (SSAT   <$> reg 12 <*> integral' 16 20 <*> (RegShiftImm S_LSL <$> integral 7 11 <*> reg 0))
   , decoder [ARM_EXT_V6]    0x06a00050 0x0fe00070 (SSAT   <$> reg 12 <*> integral' 16 20 <*> (RegShiftImm S_ASR <$> integral 7 11 <*> reg 0))
   , decoder [ARM_EXT_V6]    0x06a00f30 0x0ff00ff0 (SSAT16 <$> reg 12 <*> integral' 16 19 <*> reg 0)
-  , decoder [ARM_EXT_V6]    0x01800f90 0x0ff00ff0 (STREX  <$> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False) )
+  , decoder [ARM_EXT_V6]    0x01800f90 0x0ff00ff0 (STREX  <$> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure32 (Imm 0) <*> pure32 False) )
   , decoder [ARM_EXT_V6]    0x00400090 0x0ff000f0 (UMAAL  <$> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
   , decoder [ARM_EXT_V6]    0x0780f010 0x0ff0f0f0 (reg16_reg0_reg8 $ USAD8 )
   , decoder [ARM_EXT_V6]    0x07800010 0x0ff000f0 (reg16_reg0_reg8_reg12 $ USADA8)
@@ -426,7 +413,7 @@ armOpcodes =
   -}
   
   , decoder [ARM_EXT_V1]    0x00000090 0x0e100090 (str <$> arm_bh 5 <*> bool 6 <*> reg 12 <*> arm_s)
-  , decoder [ARM_EXT_V1]    0x00100090 0x0e100090 (ldr <$> arm_bh 5 <*> pure False <*> bool 6 <*> reg 12 <*> arm_s)
+  , decoder [ARM_EXT_V1]    0x00100090 0x0e100090 (ldr <$> arm_bh 5 <*> pure32 False <*> bool 6 <*> reg 12 <*> arm_s)
 
   , decoder [ARM_EXT_V1]    0x00000000 0x0de00000 (bool20_reg12_reg16_o $ and)
   --{ARM_EXT_V1, 0x02000000, 0x0fe00000, "and%20's%c\t%12-15r, %16-19r, %o"},
@@ -516,7 +503,7 @@ armOpcodes =
   -- {ARM_EXT_V1, 0x01e00010, 0x0fe00090, "mvn%20's%c\t%12-15R, %o"},
   
 
-  , decoder [ARM_EXT_V1]    0x06000010 0x0e000010 (pure Undefined)
+  , decoder [ARM_EXT_V1]    0x06000010 0x0e000010 (pure32 Undefined)
   
   -- {ARM_EXT_V1, 0x049d0004, 0x0fff0fff, "pop%c\t{%12-15r}\t\t; (ldr%c %12-15r, %a)"},
   -- 
@@ -527,7 +514,7 @@ armOpcodes =
   
   
   , decoder [ARM_EXT_V1]    0x049d0004 0x0fff0fff (LDRH <$> reg 12 <*> arm_a)
-  , decoder [ARM_EXT_V1]    0x04100000 0x0c100000 (ldr <$> arm_bw 22 <*> arm_t <*> pure False <*> reg 12 <*> arm_a)
+  , decoder [ARM_EXT_V1]    0x04100000 0x0c100000 (ldr <$> arm_bw 22 <*> arm_t <*> pure32 False <*> reg 12 <*> arm_a)
 
   , decoder [ARM_EXT_V1]    0x092d0000 0x0fff0000 (PUSH <$> (Regs <$> arm_m))
   , decoder [ARM_EXT_V1]    0x08800000 0x0ff00000 (STM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m))
@@ -538,14 +525,8 @@ armOpcodes =
   , decoder [ARM_EXT_V1]    0x0a000000 0x0e000000 (B <$> bool 24 <*> arm_b)
   , decoder [ARM_EXT_V1]    0x0f000000 0x0f000000 (SVC <$> integral 0 23)
 
-  , decoder [ARM_EXT_V1]    0x00000000 0x00000000 (pure Undefined)
+  , decoder [ARM_EXT_V1]    0x00000000 0x00000000 (pure32 Undefined)
   ]
 
-armOpcodeMatches :: Word32 -> ARMOpcode32 -> Bool
-armOpcodeMatches x (ARMOpcode32 _ v m _) = x .&. m == v 
-
-armDecodeOp :: Word32 -> ARMOpcode32 -> ARMInstruction
-armDecodeOp x (ARMOpcode32 _ _ _ d) = d x
-
-armDecode :: Word32 -> Maybe ARMInstruction
+armDecode :: Word32 -> Maybe UALInstruction
 armDecode i = fmap (armDecodeOp i) . find (armOpcodeMatches i) $ armOpcodes

@@ -1,5 +1,7 @@
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
 module Architecture.ARM.Common where
 
+import Data.Bits
 import Data.Word
 import Data.Int
 
@@ -49,7 +51,7 @@ data ARMEndian = Big | Little
 data Nybble = High | Low
   deriving (Show, Read, Eq, Enum)
 
-data Width = Byte | HalfWord | Word | DoubleWord
+data Width = Byte | Halfword | Word | Doubleword
   deriving (Show, Read, Eq, Enum)
 
 data ARMHint = SY | UN | ST | UNST | UK Word32 -- FIXME: should really prefix these consistently
@@ -60,3 +62,20 @@ data ARMDirection = Decrement | Increment
   
 data ARMOrder = Before | After
   deriving (Show, Read, Eq, Enum)
+
+
+class Decoder w a where
+  type Structure w a :: *
+  decoder :: [ARMArch] -> w -> w -> (w -> a) -> Structure w a
+  
+data ARMDecoder w a = ARMDecoder { decoder_arch     :: [ARMArch]
+                                 , decoder_value    :: w
+                                 , decoder_mask     :: w
+                                 , decoder_function :: w -> a
+                                 }
+
+armOpcodeMatches :: Bits w => w -> ARMDecoder w a -> Bool
+armOpcodeMatches x (ARMDecoder _ v m _) = x .&. m == v 
+
+armDecodeOp :: w -> ARMDecoder w a -> a
+armDecodeOp x (ARMDecoder _ _ _ d) = d x

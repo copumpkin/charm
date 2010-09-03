@@ -1,5 +1,8 @@
 module Architecture.ARM.Pretty where
 
+-- TODO: update this later
+
+{-
 import Architecture.ARM.ARM
 import Architecture.ARM.Thumb
 import Architecture.ARM.Opcodes
@@ -49,9 +52,9 @@ showArmCondition C_UND = "<unk>"
 
 
 showWidth Byte = "b"
-showWidth HalfWord = "h"
+showWidth Halfword = "h"
 showWidth Word = ""
-showWidth DoubleWord = "d"
+showWidth Doubleword = "d"
 
 showArmConditionalOpcode :: ARMConditionalOpcode -> String
 showArmConditionalOpcode (O_B l addr) = printf "b%s%%s 0x%x" (if l then "l" else "") addr
@@ -215,3 +218,4 @@ showArmOpMultiple (OP_RegsCaret rs) = "{" ++ (intercalate ", " . map showRegiste
 
 showArmInstruction (ARMUnconditionalInstruction x) = undefined --showArmUnconditionalOpcode x
 showArmInstruction (ARMConditionalInstruction cond x) = printf (showArmConditionalOpcode x) (showArmCondition cond)
+-}
