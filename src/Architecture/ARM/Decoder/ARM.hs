@@ -69,12 +69,6 @@ armDecodeShift i p =  if i .&. 0xff0 /= 0 then
                           else  RegShiftImm (toEnum (((fromIntegral i) .&. 0x60) `shiftR` 5)) (toEnum (((fromIntegral i) .&. 0xf00 `shiftR` 8))) (toEnum ((fromIntegral i) .&. 0xf)) 
                         else Reg (toEnum ((fromIntegral i) .&. 0xf))
 
-arm_const :: String -> D String
-arm_const x i = x
-
-arm_constint :: Int -> D String
-arm_constint x i = show x
-
 arm_a :: D ARMOpMemory
 arm_a = armDecodeAddress 
 
@@ -121,10 +115,13 @@ arm_e :: D Word32
 arm_e i = (i .&. 0xf) .|. ((i .&. 0xfff00) `shiftR` 4)
 
 arm_B :: D Int32
-arm_B i = let offset = ((if i .&. 0x800000 /= 0 then 0xff else 0) + (i .&. 0xffffff)) `shiftL` 2 
-              address = offset + {-(pc s) + -} 8 + (if i .&. 0x1000000 /= 0 then 2 else 0) in
-                fromIntegral address
-              
+arm_B = do x <- choose 23 0 0xff
+           y <- integral 0 23
+           let offset = (x + y :: Int32) `shiftL` 2
+           z <- choose 24 0 2
+           return (fromIntegral (offset + 8 + z)) -- FIXME: Do I want that +8 in there? Or should I deal with it later
+            
+         
 -- FIXME: this is ugly
 arm_C :: D String
 arm_C i = '_' : (if i .&. 0x80000 /= 0 then "f" else "" ++ 
@@ -174,8 +171,8 @@ bool b s = bit b s == 1
 enum :: (Integral i, Enum a) => i -> a
 enum = toEnum . fromIntegral
 
-arm_bw bit i = if bitRange bit bit i == 1 then Byte else Word
-arm_bh bit i = if bitRange bit bit i == 1 then Byte else Halfword
+arm_bw bit = choose bit Word Byte
+arm_bh bit = choose bit Halfword Byte
 
 reg12_reg0_reg16 f = f <$> reg 12 <*> reg 0 <*> reg 16
 
@@ -195,7 +192,7 @@ choose n t f x = if not (bool n x) then t else f
 
 bool20_reg12_reg16_o f = f <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o
 
-pure32 :: a -> D i
+pure32 :: a -> D a
 pure32 = pure
 
 armOpcodes :: [ARMDecoder Word32 UALInstruction]
@@ -220,7 +217,7 @@ armOpcodes =
 
 
   , decoder [ARM_EXT_V6T2]  0x00300090 0x0f3000f0 (pure32 Undefined :: Word32 -> UALInstruction)
-  , decoder [ARM_EXT_V6T2]  0x00300090 0x0f300090 (ldr <$> arm_bh 5 <*> const False <*> bool 6 <*> reg 12 <*> arm_s)
+  , decoder [ARM_EXT_V6T2]  0x00300090 0x0f300090 (ldr <$> arm_bh 5 <*> pure False <*> bool 6 <*> reg 12 <*> arm_s)
 
   , decoder [ARM_EXT_V6T2]  0x03000000 0x0ff00000 (MOVW <$> reg 12 <*> arm_V)
   , decoder [ARM_EXT_V6T2]  0x03400000 0x0ff00000 (MOVT <$> reg 12 <*> arm_V)
@@ -403,18 +400,26 @@ armOpcodes =
   , decoder [ARM_EXT_V5ExP] 0x01200050 0x0ff00ff0 (reg12_reg0_reg16 $ QSUB)
   , decoder [ARM_EXT_V5ExP] 0x01600050 0x0ff00ff0 (reg12_reg0_reg16 $ QDSUB)
   
-  --{ARM_EXT_V1, 0x052d0004, 0x0fff0fff, "push%c\t{%12-15r}\t\t; (str%c %12-15r, %a)"},
-
-  {-  
-    , decoder [ARM_EXT_V1]    0x052d0004 0x0fff0fff (STRH <$> reg 12 <*> arm_a)
-    , decoder [ARM_EXT_V1]    0x04000000 0x0e100000 (str <$> arm_bw 22 <*> arm_t <*> reg 12 <*> arm_a)
-    , decoder [ARM_EXT_V1]    0x06000000 0x0e100ff0 (str <$> arm_bw 22 <*> arm_t <*> reg 12 <*> arm_a)
-    , decoder [ARM_EXT_V1]    0x04000000 0x0c100010 (str <$> arm_bw 22 <*> arm_t <*> reg 12 <*> arm_a)
-  -}
+  -- This matches arm-dis.c, but is it right? It doesn't match encoding A1 or A2 in the reference
+  , decoder [ARM_EXT_V1] 0x052d0004 0x0fff0fff (PUSH <$> Regs <$> (pure <$> reg 12)) 
   
-  , decoder [ARM_EXT_V1]    0x00000090 0x0e100090 (str <$> arm_bh 5 <*> bool 6 <*> reg 12 <*> arm_s)
-  , decoder [ARM_EXT_V1]    0x00100090 0x0e100090 (ldr <$> arm_bh 5 <*> pure32 False <*> bool 6 <*> reg 12 <*> arm_s)
-
+  , decoder [ARM_EXT_V1] 0x04400000 0x0e500000 (str Byte <$> arm_t <*> reg 12 <*> arm_a) -- "strb%t%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1] 0x04000000 0x0e500000 (str Word <$> arm_t <*> reg 12 <*> arm_a) -- "str%t%c\t%12-15r, %a"},
+  , decoder [ARM_EXT_V1] 0x06400000 0x0e500ff0 (str Byte <$> arm_t <*> reg 12 <*> arm_a) -- "strb%t%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1] 0x06000000 0x0e500ff0 (str Word <$> arm_t <*> reg 12 <*> arm_a) -- "str%t%c\t%12-15r, %a"},
+  , decoder [ARM_EXT_V1] 0x04400000 0x0c500010 (str Byte <$> arm_t <*> reg 12 <*> arm_a) -- "strb%t%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1] 0x04000000 0x0c500010 (str Word <$> arm_t <*> reg 12 <*> arm_a) -- "str%t%c\t%12-15r, %a"},
+  
+  , decoder [ARM_EXT_V1] 0x04400000 0x0e500000 (STRB <$> reg 12 <*> arm_a) -- "strb%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1] 0x06400000 0x0e500010 (STRB <$> reg 12 <*> arm_a) -- "strb%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1] 0x004000b0 0x0e5000f0 (STRH <$> reg 12 <*> arm_a) -- "strh%c\t%12-15R, %s"},
+  , decoder [ARM_EXT_V1] 0x000000b0 0x0e500ff0 (STRH <$> reg 12 <*> arm_a) -- "strh%c\t%12-15R, %s"},
+  
+  , decoder [ARM_EXT_V1] 0x00500090 0x0e5000f0 (pure32 Undefined)
+  , decoder [ARM_EXT_V1] 0x00500090 0x0e500090 (ldr <$> arm_bh 5 <*> pure32 False <*> bool 6 <*> reg 12 <*> arm_s) -- "ldr%6's%5?hb%c\t%12-15R, %s"},
+  , decoder [ARM_EXT_V1] 0x00100090 0x0e500ff0 (pure32 Undefined)
+  , decoder [ARM_EXT_V1] 0x00100090 0x0e500f90 (ldr <$> arm_bh 5 <*> pure32 False <*> bool 6 <*> reg 12 <*> arm_s) -- "ldr%6's%5?hb%c\t%12-15R, %s"},
+  
   , decoder [ARM_EXT_V1]    0x00000000 0x0de00000 (bool20_reg12_reg16_o $ and)
   --{ARM_EXT_V1, 0x02000000, 0x0fe00000, "and%20's%c\t%12-15r, %16-19r, %o"},
   --{ARM_EXT_V1, 0x00000000, 0x0fe00010, "and%20's%c\t%12-15r, %16-19r, %o"},
@@ -522,7 +527,7 @@ armOpcodes =
   , decoder [ARM_EXT_V1]    0x08bd0000 0x0fff0000 (POP <$> (Regs <$> arm_m))
   , decoder [ARM_EXT_V1]    0x08900000 0x0f900000 (LDM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m))
   , decoder [ARM_EXT_V1]    0x08100000 0x0e100000 (ldm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
-  , decoder [ARM_EXT_V1]    0x0a000000 0x0e000000 (B <$> bool 24 <*> arm_b)
+  , decoder [ARM_EXT_V1]    0x0a000000 0x0e000000 (b <$> bool 24 <*> arm_b)
   , decoder [ARM_EXT_V1]    0x0f000000 0x0f000000 (SVC <$> integral 0 23)
 
   , decoder [ARM_EXT_V1]    0x00000000 0x00000000 (pure32 Undefined)

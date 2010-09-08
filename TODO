@@ -3,3 +3,5 @@
 - Remove evil dependence on enum directions in decoding
 - The decoder polymorphism for automatically deciding what to use (for condition codes and the like) is disgusting. There's a lot of repetition and it can probably be done a lot more elegantly
 - Construct decision tree from list of decoders to upgrade our lookups from linear to logarithmic in the number of instructions per set
+- Remove repetition and factor instructions into common behavior as much as possible again. Having separate constructors for MUL and MULS is unnecessary and could be covered by a Bool as it was originally.
+- Use GADT data families for instructions, parametrized by instruction set

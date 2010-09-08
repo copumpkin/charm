@@ -63,6 +63,7 @@ data ARMDirection = Decrement | Increment
 data ARMOrder = Before | After
   deriving (Show, Read, Eq, Enum)
 
+data Mode = ARM | Thumb | Jazelle | ThumbEE
 
 class Decoder w a where
   type Structure w a :: *

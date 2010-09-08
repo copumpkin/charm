@@ -1,221 +1,295 @@
 module Architecture.ARM.Pretty where
 
--- TODO: update this later
+import Prelude hiding (EQ, LT, GT)
 
-{-
-import Architecture.ARM.ARM
-import Architecture.ARM.Thumb
-import Architecture.ARM.Opcodes
+import Architecture.ARM.Common
+import Architecture.ARM.Instructions.UAL
 
+import Text.Printf
 import Text.PrettyPrint
 
+import Data.List
 
-showRegister R0 = "r0"
-showRegister R1 = "r1"
-showRegister R2 = "r2"
-showRegister R3 = "r3"
-showRegister R4 = "r4"
-showRegister R5 = "r5"
-showRegister R6 = "r6"
-showRegister R7 = "r7"
-showRegister R8 = "r8"
-showRegister R9 = "r9"
+-- All this string building is inefficient. Fix it sometime using a real prettyprinting library
+
+{-
+showRegister R0  = "r0"
+showRegister R1  = "r1"
+showRegister R2  = "r2"
+showRegister R3  = "r3"
+showRegister R4  = "r4"
+showRegister R5  = "r5"
+showRegister R6  = "r6"
+showRegister R7  = "r7"
+showRegister R8  = "r8"
+showRegister R9  = "r9"
 showRegister R10 = "r10"
 showRegister R11 = "r11"
 showRegister R12 = "r12"
-showRegister SP = "sp"
-showRegister LR = "lr"
-showRegister PC = "pc"
-
-
-showArmShift S_LSL = "lsl"
-showArmShift S_LSR = "lsr"
-showArmShift S_ASR = "asr"
-showArmShift S_ROR = "ror"
-
-showArmCondition C_EQ = "eq"
-showArmCondition C_NE = "ne"
-showArmCondition C_CS = "cs"
-showArmCondition C_CC = "cc"
-showArmCondition C_MI = "mi"
-showArmCondition C_PL = "pl"
-showArmCondition C_VS = "vs"
-showArmCondition C_VC = "vc"
-showArmCondition C_HI = "hi"
-showArmCondition C_LS = "ls"
-showArmCondition C_GE = "ge"
-showArmCondition C_LT = "lt"
-showArmCondition C_GT = "gt"
-showArmCondition C_LE = "le"
-showArmCondition C_AL = ""
-showArmCondition C_UND = "<unk>"
-
-
-showWidth Byte = "b"
-showWidth Halfword = "h"
-showWidth Word = ""
-showWidth Doubleword = "d"
-
-showArmConditionalOpcode :: ARMConditionalOpcode -> String
-showArmConditionalOpcode (O_B l addr) = printf "b%s%%s 0x%x" (if l then "l" else "") addr
-showArmConditionalOpcode (O_BLX reg) = printf "blx%%s %s" (showRegister reg)
-showArmConditionalOpcode (O_BX reg) = printf "bx%%s %s" (showRegister reg) 
-showArmConditionalOpcode (O_BXJ reg) = printf "bxj%%s %s" (showRegister reg) 
-showArmConditionalOpcode (O_AND s rd rn d) = printf "and%%s%s %s, %s, %s" (if s then "s" else "") (showRegister rd) (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_EOR s rd rn d) = printf "eor%%s%s %s, %s, %s" (if s then "s" else "") (showRegister rd) (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_SUB s rd rn d) = printf "sub%%s%s %s, %s, %s" (if s then "s" else "") (showRegister rd) (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_RSB s rd rn d) = printf "rsb%%s%s %s, %s, %s" (if s then "s" else "") (showRegister rd) (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_ADD s rd rn d) = printf "add%%s%s %s, %s, %s" (if s then "s" else "") (showRegister rd) (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_ADC s rd rn d) = printf "adc%%s%s %s, %s, %s" (if s then "s" else "") (showRegister rd) (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_SBC s rd rn d) = printf "sbc%%s%s %s, %s, %s" (if s then "s" else "") (showRegister rd) (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_RSC s rd rn d) = printf "rsc%%s%s %s, %s, %s" (if s then "s" else "") (showRegister rd) (showRegister rn) (showArmOpData d) 
-
-showArmConditionalOpcode (O_TST rn d) = printf "tst%%s %s, %s" (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_TEQ rn d) = printf "teq%%s %s, %s" (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_CMP rn d) = printf "cmp%%s %s, %s" (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_CMN rn d) = printf "cmn%%s %s, %s" (showRegister rn) (showArmOpData d) 
-
-showArmConditionalOpcode (O_ORR s rd rn d) = printf "orr%%s%s %s, %s, %s" (if s then "s" else "") (showRegister rd) (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_MOV s rd d) = printf "mov%%s%s %s, %s" (if s then "s" else "") (showRegister rd) (showArmOpData d) 
-showArmConditionalOpcode (O_LSL s rd d) = printf "lsl%%s%s %s, %s" (if s then "s" else "") (showRegister rd) (showArmOpData d) 
-showArmConditionalOpcode (O_LSR s rd d) = printf "lsr%%s%s %s, %s" (if s then "s" else "") (showRegister rd) (showArmOpData d) 
-showArmConditionalOpcode (O_ASR s rd d) = printf "asr%%s%s %s, %s" (if s then "s" else "") (showRegister rd) (showArmOpData d) 
-showArmConditionalOpcode (O_RRX s rd d) = printf "rrx%%s%s %s, %s" (if s then "s" else "") (showRegister rd) (showRegister d) 
-showArmConditionalOpcode (O_ROR s rd d) = printf "ror%%s%s %s, %s" (if s then "s" else "") (showRegister rd) (showArmOpData d) 
-showArmConditionalOpcode (O_BIC s rd rn d) = printf "bic%%s%s %s, %s, %s" (if s then "s" else "") (showRegister rd) (showRegister rn) (showArmOpData d) 
-showArmConditionalOpcode (O_MVN s rd d) = printf "mvn%%s%s %s, %s" (if s then "s" else "") (showRegister rd) (showArmOpData d) 
-
-{-
-| O_MLA Bool ARMRegister ARMRegister ARMRegister ARMRegister
-| O_MUL Bool ARMRegister ARMRegister ARMRegister 
-| O_SMLA Nybble Nybble ARMRegister ARMRegister ARMRegister ARMRegister -- SMLABB, SMLABT, SBMLATB, SMLATT
-| O_SMLAD Nybble ARMRegister ARMRegister ARMRegister ARMRegister
-| O_SMLAL (Maybe (Nybble, Nybble)) ARMRegister ARMRegister ARMRegister ARMRegister -- FIXME: first two ArmRegisters are more complicated
-| O_SMLALD Nybble ARMRegister ARMRegister ARMRegister ARMRegister -- FIXME as above
-| O_SMLAW Nybble ARMRegister ARMRegister ARMRegister ARMRegister
-| O_SMLSD Nybble ARMRegister ARMRegister ARMRegister ARMRegister
-| O_SMLSLD Nybble ARMRegister ARMRegister ARMRegister ARMRegister -- FIXME as above
-| O_SMMLA Bool ARMRegister ARMRegister ARMRegister ARMRegister
-| O_SMMUL Bool ARMRegister ARMRegister ARMRegister 
-| O_SMMLS Bool ARMRegister ARMRegister ARMRegister ARMRegister
-| O_SMUAD Nybble ARMRegister ARMRegister ARMRegister
-| O_SMUL Nybble Nybble ARMRegister ARMRegister ARMRegister
-| O_SMULL Bool ARMRegister ARMRegister ARMRegister ARMRegister
-| O_SMULW Nybble ARMRegister ARMRegister ARMRegister
-| O_SMUSD Nybble ARMRegister ARMRegister ARMRegister
-| O_UMAAL ARMRegister ARMRegister ARMRegister ARMRegister
-| O_UMLAL Bool ARMRegister ARMRegister ARMRegister ARMRegister
-| O_UMULL Bool ARMRegister ARMRegister ARMRegister ARMRegister
-
-| O_QADD ARMRegister ARMRegister ARMRegister
-| O_QADD16 ARMRegister ARMRegister ARMRegister
-| O_QADD8 ARMRegister ARMRegister ARMRegister
-| O_QADDSUBX ARMRegister ARMRegister ARMRegister
-| O_QDADD ARMRegister ARMRegister ARMRegister
-| O_QDSUB ARMRegister ARMRegister ARMRegister
-| O_QSUB ARMRegister ARMRegister ARMRegister
-| O_QSUB16 ARMRegister ARMRegister ARMRegister
-| O_QSUB8 ARMRegister ARMRegister ARMRegister
-| O_QSUBADDX ARMRegister ARMRegister ARMRegister
-
-| O_SADD16 ARMRegister ARMRegister ARMRegister
-| O_SADD8 ARMRegister ARMRegister ARMRegister
-| O_SADDSUBX ARMRegister ARMRegister ARMRegister
-| O_SSUB16 ARMRegister ARMRegister ARMRegister
-| O_SSUB8 ARMRegister ARMRegister ARMRegister
-| O_SSUBADDX ARMRegister ARMRegister ARMRegister
-
-| O_SHADD16 ARMRegister ARMRegister ARMRegister
-| O_SHADD8 ARMRegister ARMRegister ARMRegister
-| O_SHADDSUBX ARMRegister ARMRegister ARMRegister
-| O_SHSUB16 ARMRegister ARMRegister ARMRegister
-| O_SHSUB8 ARMRegister ARMRegister ARMRegister
-| O_SHSUBADDX ARMRegister ARMRegister ARMRegister
-
-| O_UADD16 ARMRegister ARMRegister ARMRegister
-| O_UADD8 ARMRegister ARMRegister ARMRegister
-| O_UADDSUBX ARMRegister ARMRegister ARMRegister
-| O_USUB16 ARMRegister ARMRegister ARMRegister
-| O_USUB8 ARMRegister ARMRegister ARMRegister
-| O_USUBADDX ARMRegister ARMRegister ARMRegister
-
-| O_UHADD16 ARMRegister ARMRegister ARMRegister
-| O_UHADD8 ARMRegister ARMRegister ARMRegister
-| O_UHADDSUBX ARMRegister ARMRegister ARMRegister
-| O_UHSUB16 ARMRegister ARMRegister ARMRegister
-| O_UHSUB8 ARMRegister ARMRegister ARMRegister
-| O_UHSUBADDX ARMRegister ARMRegister ARMRegister
-
-| O_UQADD16 ARMRegister ARMRegister ARMRegister
-| O_UQADD8 ARMRegister ARMRegister ARMRegister
-| O_UQADDSUBX ARMRegister ARMRegister ARMRegister
-| O_UQSUB16 ARMRegister ARMRegister ARMRegister
-| O_UQSUB8 ARMRegister ARMRegister ARMRegister
-| O_UQSUBADDX ARMRegister ARMRegister ARMRegister
-
-| O_SXTAB16 ARMRegister ARMRegister ARMOpData -- rotate
-| O_SXTAB ARMRegister ARMRegister ARMOpData -- rotate
-| O_SXTAH ARMRegister ARMRegister ARMOpData -- rotate
-| O_SXTB16 ARMRegister ARMOpData -- rotate
-| O_SXT Width ARMRegister ARMOpData --rotate only -- ONLY SXTB, SXTH
-| O_UXTAB16 ARMRegister ARMRegister ARMOpData -- rotate 
-| O_UXTAB ARMRegister ARMRegister ARMOpData -- rotate
-| O_UXTAH ARMRegister ARMRegister ARMOpData -- rotate
-| O_UXTB16 ARMRegister ARMOpData -- rotate
-| O_UXT Width ARMRegister ARMOpData -- rotate -- UXTB, UXTH
-
-| O_CLZ ARMRegister ARMRegister
-| O_USAD8 ARMRegister ARMRegister ARMRegister 
-| O_USADA8 ARMRegister ARMRegister ARMRegister ARMRegister
-| O_PKHBT ARMRegister ARMRegister ARMOpData -- rotate/shift
-| O_PKHTB ARMRegister ARMRegister ARMOpData -- rotate/shift
-| O_REV ARMRegister ARMRegister
-| O_REV16 ARMRegister ARMRegister
-| O_REVSH ARMRegister ARMRegister
-| O_SEL ARMRegister ARMRegister ARMRegister
-| O_SSAT ARMRegister Word8 ARMOpData -- rotate/shift
-| O_SSAT16 ARMRegister Word8 ARMRegister
-| O_USAT ARMRegister Word8 ARMOpData -- rotate/shift
-| O_USAT16 ARMRegister Word8 ARMRegister
-
-| O_MRS ARMRegister ARMStatusRegister
-| O_MSR 
+showRegister SP  = "sp"
+showRegister LR  = "lr"
+showRegister PC  = "pc"
 -}
 
-showArmConditionalOpcode (O_LDR w t s rd m) = printf "ldr%s%s%s%%s %s, %s" (if s then "s" else "") (showWidth w) (if t then "t" else "") (showRegister rd) (showArmOpMemory m)
-showArmConditionalOpcode (O_STR w t s rd m) = printf "str%s%s%s%%s %s, %s" (if s then "s" else "") (showWidth w) (if t then "t" else "") (showRegister rd) (showArmOpMemory m)
+showRegister = show
 
--- | O_LDREX
--- | O_STREX
-   
--- | O_LDM -- Note that there are three different forms
--- | O_STM -- Note that there are two different forms
--- | O_PUSH [ARMRegister]
--- | O_POP [ARMRegister]
+showArmShift S_LSL = "LSL"
+showArmShift S_LSR = "LSR"
+showArmShift S_ASR = "ASR"
+showArmShift S_ROR = "ROR"
 
-
-showArmConditionalOpcode _ = "unknown %s"
+showCondition EQ = "EQ"
+showCondition NE = "NE"
+showCondition CS = "CS"
+showCondition CC = "CC"
+showCondition MI = "MI"
+showCondition PL = "PL"
+showCondition VS = "VS"
+showCondition VC = "VC"
+showCondition HI = "HI"
+showCondition LS = "LS"
+showCondition GE = "GE"
+showCondition LT = "LT"
+showCondition GT = "GT"
+showCondition LE = "LE"
+showCondition AL = ""
+showCondition UND = "<unk>"
 
 
 showArmOpData :: ARMOpData -> String
-showArmOpData (OP_Imm i) = printf "#%d" i
-showArmOpData (OP_Reg reg) = showRegister reg
-showArmOpData (OP_RegShiftImm sh i reg) = printf "%s, %s #%d" (showRegister reg) (showArmShift sh) i
-showArmOpData (OP_RegShiftReg sh regs reg) = printf "%s, %s %s" (showRegister reg) (showArmShift sh) (showRegister regs)
-showArmOpData (OP_RegShiftRRX reg) = printf "%s, RRX" (showRegister reg)
+showArmOpData (Imm i) = printf "#%d" i
+showArmOpData (Reg reg) = showRegister reg
+showArmOpData (RegShiftImm sh i reg) = printf "%s, %s #%d" (showRegister reg) (showArmShift sh) i
+showArmOpData (RegShiftReg sh regs reg) = printf "%s, %s %s" (showRegister reg) (showArmShift sh) (showRegister regs)
+showArmOpData (RegShiftRRX reg) = printf "%s, RRX" (showRegister reg)
 
 showArmOpMemory :: ARMOpMemory -> String
-showArmOpMemory (OP_MemReg base d up) = (printf "[%s, %s]" (showRegister base) (showArmOpData d)) ++ if up then "!" else ""
-showArmOpMemory (OP_MemRegNeg base d up) = (printf "[%s, -%s]" (showRegister base) (showArmOpData d)) ++ if up then "!" else ""
-showArmOpMemory (OP_MemRegPost base d) = printf "[%s], %s" (showRegister base) (showArmOpData d)
-showArmOpMemory (OP_MemRegPostNeg base d) = printf "[%s], -%s" (showRegister base) (showArmOpData d)
+showArmOpMemory (MemReg base (Imm 0) up) = printf "[%s]" (showRegister base) ++ if up then "!" else ""
+showArmOpMemory (MemReg base d up) = printf "[%s, %s]" (showRegister base) (showArmOpData d) ++ if up then "!" else ""
+showArmOpMemory (MemRegNeg base d up) = printf "[%s, -%s]" (showRegister base) (showArmOpData d) ++ if up then "!" else ""
+showArmOpMemory (MemRegPost base d) = printf "[%s], %s" (showRegister base) (showArmOpData d)
+showArmOpMemory (MemRegPostNeg base d) = printf "[%s], -%s" (showRegister base) (showArmOpData d)
 
 
 showArmOpMultiple :: ARMOpMultiple -> String
-showArmOpMultiple (OP_Regs rs) = "{" ++ (intercalate ", " . map showRegister $ rs) ++ "}"
-showArmOpMultiple (OP_RegsCaret rs) = "{" ++ (intercalate ", " . map showRegister $ rs) ++ "}^"
+showArmOpMultiple (Regs rs) = "{" ++ (intercalate ", " . map showRegister $ rs) ++ "}"
+showArmOpMultiple (RegsCaret rs) = "{" ++ (intercalate ", " . map showRegister $ rs) ++ "}^"
 
+showConditional :: Conditional -> String
+showConditional (B off)  = printf "B%%s %i" off
+showConditional (BL off) = printf "BL%%s %i" off
+showConditional (BLX rd) = printf "BLX%%s %s" (showRegister rd)
+showConditional (BX  rd) = printf "BX%%s %s"  (showRegister rd)
+showConditional (BXJ rd) = printf "BXJ%%s %s" (showRegister rd)
+showConditional (AND  rd rn k) = printf "AND%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (ANDS rd rn k) = printf "ANDS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (EOR  rd rn k) = printf "EOR%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (EORS rd rn k) = printf "EORS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (SUB  rd rn k) = printf "SUB%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (SUBS rd rn k) = printf "SUBS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (RSB  rd rn k) = printf "RSB%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (RSBS rd rn k) = printf "RSBS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (ADD  rd rn k) = printf "ADD%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (ADDS rd rn k) = printf "ADDS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (ADC  rd rn k) = printf "ADC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (ADCS rd rn k) = printf "ADCS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (SBC  rd rn k) = printf "SBC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (SBCS rd rn k) = printf "SBCS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (RSC  rd rn k) = printf "RSC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (RSCS rd rn k) = printf "RSCS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (TST rn d)     = printf "TST%%s %s, %s" (showRegister rn) (showArmOpData d)
+showConditional (TEQ rn d)     = printf "TEQ%%s %s, %s" (showRegister rn) (showArmOpData d)
+showConditional (CMP rn d)     = printf "CMP%%s %s, %s" (showRegister rn) (showArmOpData d)
+showConditional (CMN rn d)     = printf "CMN%%s %s, %s" (showRegister rn) (showArmOpData d)
+showConditional (ORR  rd rn k) = printf "ORR%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (ORRS rd rn k) = printf "ORRS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData k)
+showConditional (MOV  rd d)    = printf "MOV%%s %s, %s"  (showRegister rd) (showArmOpData d)
+showConditional (MOVS rd d)    = printf "MOVS%%s %s, %s" (showRegister rd) (showArmOpData d)
+showConditional (LSL  rd d)    = printf "LSL%%s %s, %s"  (showRegister rd) (showArmOpData d)
+showConditional (LSLS rd d)    = printf "LSLS%%s %s, %s" (showRegister rd) (showArmOpData d)
+showConditional (LSR  rd d)    = printf "LSR%%s %s, %s"  (showRegister rd) (showArmOpData d)
+showConditional (LSRS rd d)    = printf "LSRS%%s %s, %s" (showRegister rd) (showArmOpData d)
+showConditional (ASR  rd d)    = printf "ASR%%s %s, %s"  (showRegister rd) (showArmOpData d)
+showConditional (ASRS rd d)    = printf "ASRS%%s %s, %s" (showRegister rd) (showArmOpData d)
+showConditional (RRX  rd rm)   = printf "RRX%%s %s, %s"  (showRegister rd) (showRegister rm)
+showConditional (RRXS rd rm)   = printf "RRXS%%s %s, %s" (showRegister rd) (showRegister rm)
+showConditional (ROR  rd d)    = printf "ROR%%s %s, %s"  (showRegister rd) (showArmOpData d)
+showConditional (RORS rd d)    = printf "RORS%%s %s, %s" (showRegister rd) (showArmOpData d)
+showConditional (BIC  rd rn d) = printf "BIC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showArmOpData d)
+showConditional (BICS rd rn d) = printf "BICS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData d)
+showConditional (MVN  rd d)    = printf "MVN%%s %s, %s"  (showRegister rd) (showArmOpData d)
+showConditional (MVNS rd d)    = printf "MVNS%%s %s, %s" (showRegister rd) (showArmOpData d)
+showConditional (MLA  rd rn rm ra)    = printf "MLA%%s %s, %s, %s, %s"     (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (MLAS rd rn rm ra)    = printf "MLAS%%s %s, %s, %s, %s"    (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (MUL  rd rn rm)       = printf "MUL%%s %s, %s, %s"     (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (MULS rd rn rm)       = printf "MULS%%s %s, %s, %s"     (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMLABB  rd rn rm ra) = printf "SMLABB%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLABT  rd rn rm ra) = printf "SMLABT%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLATB  rd rn rm ra) = printf "SMLATB%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLATT  rd rn rm ra) = printf "SMLATT%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLAWB  rd rn rm ra) = printf "SMLAWB%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLAWT  rd rn rm ra) = printf "SMLAWT%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLAD   rd rn rm ra) = printf "SMLAD%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLADX  rd rn rm ra) = printf "SMLADX%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLAL   rd rn rm ra) = printf "SMLAL%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLALS  rd rn rm ra) = printf "SMLALS%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLALBB rd rn rm ra) = printf "SMLALBB%%s %s, %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLALBT rd rn rm ra) = printf "SMLALBT%%s %s, %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLALTB rd rn rm ra) = printf "SMLALTB%%s %s, %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLALTT rd rn rm ra) = printf "SMLALTT%%s %s, %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLALD  rd rn rm ra) = printf "SMLALD%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLALDX rd rn rm ra) = printf "SMLALDX%%s %s, %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLSD   rd rn rm ra) = printf "SMLSD%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLSDX  rd rn rm ra) = printf "SMLSDX%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLSLD  rd rn rm ra) = printf "SMLSLD%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMLSLDX rd rn rm ra) = printf "SMLSLDX%%s %s, %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMMLA   rd rn rm ra) = printf "SMMLA%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMMLAR  rd rn rm ra) = printf "SMMLAR%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMMUL   rd rn rm)    = printf "SMMUL%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMMULR  rd rn rm)    = printf "SMMULR%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMMLS   rd rn rm ra) = printf "SMMLS%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMMLSR  rd rn rm ra) = printf "SMMLSR%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMUAD   rd rn rm)    = printf "SMUAD%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMUADX  rd rn rm)    = printf "SMUADX%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMULBB  rd rn rm)    = printf "SMULBB%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMULBT  rd rn rm)    = printf "SMULBT%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMULTB  rd rn rm)    = printf "SMULTB%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMULTT  rd rn rm)    = printf "SMULTT%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMULL   rd rn rm ra) = printf "SMULL%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMULLS  rd rn rm ra) = printf "SMULLS%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (SMULWB  rd rn rm)    = printf "SMULWB%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMULWT  rd rn rm)    = printf "SMULWT%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMUSD   rd rn rm)    = printf "SMUSD%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SMUSDX  rd rn rm)    = printf "SMUSDX%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (UMAAL   rd rn rm ra) = printf "UMAAL%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (UMLAL   rd rn rm ra) = printf "UMLAL%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (UMLALS  rd rn rm ra) = printf "UMLALS%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (UMULL   rd rn rm ra) = printf "UMULL%%s %s, %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (UMULLS  rd rn rm ra) = printf "UMULLS%%s %s, %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (QADD    rd rm rn) = printf "QADD%%s %s, %s, %s"    (showRegister rd) (showRegister rm) (showRegister rn) -- NB: inverted operands
+showConditional (QADD16  rd rn rm) = printf "QADD16%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (QADD8   rd rn rm) = printf "QADD8%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (QASX    rd rn rm) = printf "QASX%%s %s, %s, %s"    (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (QDADD   rd rn rm) = printf "QDADD%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (QDSUB   rd rn rm) = printf "QDSUB%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (QSUB    rd rm rn) = printf "QSUB%%s %s, %s, %s"    (showRegister rd) (showRegister rm) (showRegister rn) -- NB: inverted operands
+showConditional (QSUB16  rd rn rm) = printf "QSUB16%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (QSUB8   rd rn rm) = printf "QSUB8%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (QSAX    rd rn rm) = printf "QSAX%%s %s, %s, %s"    (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SADD16  rd rn rm) = printf "SADD16%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SADD8   rd rn rm) = printf "SADD8%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SASX    rd rn rm) = printf "SASX%%s %s, %s, %s"    (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SSUB16  rd rn rm) = printf "SSUB16%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SSUB8   rd rn rm) = printf "SSUB8%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SSAX    rd rn rm) = printf "SSAX%%s %s, %s, %s"    (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SHADD16 rd rn rm) = printf "SHADD16%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SHADD8  rd rn rm) = printf "SHADD8%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SHASX   rd rn rm) = printf "SHASX%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SHSUB16 rd rn rm) = printf "SHSUB16%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SHSUB8  rd rn rm) = printf "SHSUB8%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SHSAX   rd rn rm) = printf "SHSAX%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UADD16  rd rn rm) = printf "UADD16%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UADD8   rd rn rm) = printf "UADD8%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UASX    rd rn rm) = printf "UASX%%s %s, %s, %s"    (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (USUB16  rd rn rm) = printf "USUB16%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (USUB8   rd rn rm) = printf "USUB8%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (USAX    rd rn rm) = printf "USAX%%s %s, %s, %s"    (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UHADD16 rd rn rm) = printf "UHADD16%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UHADD8  rd rn rm) = printf "UHADD8%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UHASX   rd rn rm) = printf "UHASX%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UHSUB16 rd rn rm) = printf "UHSUB16%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UHSUB8  rd rn rm) = printf "UHSUB8%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UHSAX   rd rn rm) = printf "UHSAX%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UQADD16 rd rn rm) = printf "UQADD16%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UQADD8  rd rn rm) = printf "UQADD8%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UQASX   rd rn rm) = printf "UQASX%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UQSUB16 rd rn rm) = printf "UQSUB16%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UQSUB8  rd rn rm) = printf "UQSUB8%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (UQSAX   rd rn rm) = printf "UQSAX%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showRegister rm) 
+showConditional (SXTAB16 rd rn d)  = printf "SXTAB16%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData d) 
+showConditional (SXTAB   rd rn d)  = printf "SXTAB%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showArmOpData d) 
+showConditional (SXTAH   rd rn d)  = printf "SXTAH%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showArmOpData d) 
+showConditional (SXTB16  rd d)     = printf "SXTB16%%s %s, %s"     (showRegister rd) (showArmOpData d)
+showConditional (SXTB    rd d)     = printf "SXTB%%s %s, %s"       (showRegister rd) (showArmOpData d)
+showConditional (SXTH    rd d)     = printf "SXTH%%s %s, %s"       (showRegister rd) (showArmOpData d)
+showConditional (UXTAB16 rd rn d)  = printf "UXTAB16%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData d)
+showConditional (UXTAB   rd rn d)  = printf "UXTAB%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showArmOpData d)
+showConditional (UXTAH   rd rn d)  = printf "UXTAH%%s %s, %s, %s"   (showRegister rd) (showRegister rn) (showArmOpData d)
+showConditional (UXTB16  rd d)     = printf "UXTB16%%s %s, %s, %s"  (showRegister rd) (showArmOpData d)
+showConditional (UXTB    rd d)     = printf "UXTB%%s %s, %s, %s"    (showRegister rd) (showArmOpData d)
+showConditional (UXTH    rd d)     = printf "UXTH%%s %s, %s, %s"    (showRegister rd) (showArmOpData d)
+showConditional (UBFX    rd rn lsb w) = printf "UBFX%%s %s, %i, %i" (showRegister rd) (showRegister rn) lsb w
+showConditional (SBFX    rd rn lsb w) = printf "SBFX%%s %s, %i, %i" (showRegister rd) (showRegister rn) lsb w
+showConditional (CLZ rd rm) = printf "CLZ%%s %s, %s" (showRegister rd) (showRegister rm)
+showConditional (USAD8  rd rn rm) = printf "USAD8%%s %s, %s %s" (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (USADA8 rd rn rm ra) = printf "USADA8%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm) (showRegister ra)
+showConditional (PKHBT rd rn d) = printf "PKHBT%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData d)
+showConditional (PKHTB rd rn d) = printf "PKHTB%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showArmOpData d)
+showConditional (REV   rd rm) = printf "REV%%s %s, %s" (showRegister rd) (showRegister rm)
+showConditional (REV16 rd rm) = printf "REV16%%s %s, %s" (showRegister rd) (showRegister rm)
+showConditional (REVSH rd rm) = printf "REVSH%%s %s, %s" (showRegister rd) (showRegister rm)
+showConditional (SEL rd rn rm) = printf "SEL%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showRegister rm)
+showConditional (SSAT   rd imm d)  = printf "SSAT%%s %s, %i, %s"   (showRegister rd) imm (showArmOpData d)
+showConditional (SSAT16 rd imm rn) = printf "SSAT16%%s %s, %i, %s" (showRegister rd) imm (showRegister rn)
+showConditional (USAT   rd imm d)  = printf "USAT%%s %s, %i, %s"   (showRegister rd) imm (showArmOpData d)
+showConditional (USAT16 rd imm rn) = printf "USAT16%%s %s, %i, %s" (showRegister rd) imm (showRegister rn)
+showConditional (MRS rd spec) = printf "MRS%%s %s, %s" (showRegister rd) (show spec) -- check
+showConditional (MSR x y d) = undefined -- FIX
+showConditional (LDR    rt mem) = printf "LDR%%s %s, %s"    (showRegister rt) (showArmOpMemory mem)
+showConditional (LDRB   rt mem) = printf "LDRB%%s %s, %s"   (showRegister rt) (showArmOpMemory mem)
+showConditional (LDRH   rt mem) = printf "LDRH%%s %s, %s"   (showRegister rt) (showArmOpMemory mem)
+showConditional (LDRD   rt mem) = printf "LDRD%%s %s, %s"   (showRegister rt) (showArmOpMemory mem)
+showConditional (LDRBT  rt mem) = printf "LDRBT%%s %s, %s"  (showRegister rt) (showArmOpMemory mem)
+showConditional (LDRHT  rt mem) = printf "LDRHT%%s %s, %s"  (showRegister rt) (showArmOpMemory mem)
+showConditional (LDRT   rt mem) = printf "LDRT%%s %s, %s"   (showRegister rt) (showArmOpMemory mem)
+showConditional (LDRSB  rt mem) = printf "LDRSB%%s %s, %s"  (showRegister rt) (showArmOpMemory mem)
+showConditional (LDRSH  rt mem) = printf "LDRSH%%s %s, %s"  (showRegister rt) (showArmOpMemory mem)
+showConditional (STR    rt mem) = printf "STR%%s %s, %s"    (showRegister rt) (showArmOpMemory mem)
+showConditional (STRB   rt mem) = printf "STRB%%s %s, %s"   (showRegister rt) (showArmOpMemory mem)
+showConditional (STRH   rt mem) = printf "STRH%%s %s, %s"   (showRegister rt) (showArmOpMemory mem)
+showConditional (STRD   rt mem) = printf "STRD%%s %s, %s"   (showRegister rt) (showArmOpMemory mem)
+showConditional (STRBT  rt mem) = printf "STRBT%%s %s, %s"  (showRegister rt) (showArmOpMemory mem)
+showConditional (STRHT  rt mem) = printf "STRHT%%s %s, %s"  (showRegister rt) (showArmOpMemory mem)
+showConditional (STRT   rt mem) = printf "STRT%%s %s, %s"   (showRegister rt) (showArmOpMemory mem)
+showConditional (LDREX  rt mem) = printf "LDREX%%s %s, %s"  (showRegister rt) (showArmOpMemory mem)
+showConditional (LDREXB rt mem) = printf "LDREXB%%s %s, %s" (showRegister rt) (showArmOpMemory mem)
+showConditional (LDREXH rt mem) = printf "LDREXH%%s %s, %s" (showRegister rt) (showArmOpMemory mem)
+showConditional (LDREXD rt rt2 mem)    = printf "LDREXD%%s %s, %s, %s" (showRegister rt) (showRegister rt2) (showArmOpMemory mem)
+showConditional (STREX  rd rt mem)     = printf "STREX%%s %s, %s, %s"  (showRegister rd) (showRegister rt) (showArmOpMemory mem)
+showConditional (STREXB rd rt mem)     = printf "STREXB%%s %s, %s, %s" (showRegister rd) (showRegister rt) (showArmOpMemory mem)
+showConditional (STREXH rd rt mem)     = printf "STREXH%%s %s, %s, %s" (showRegister rd) (showRegister rt) (showArmOpMemory mem)
+showConditional (STREXD rd rt rt2 mem) = printf "STREXD%%s %s, %s, %s" (showRegister rd) (showRegister rt) (showRegister rt2) (showArmOpMemory mem)
+showConditional (LDM   bang rd regs)   = printf "LDM%%s %s%s, %s"   (showRegister rd) (cond "!" "" bang) (showArmOpMultiple regs)
+showConditional (LDMDA bang rd regs)   = printf "LDMDA%%s %s%s, %s" (showRegister rd) (cond "!" "" bang) (showArmOpMultiple regs)
+showConditional (LDMDB bang rd regs)   = printf "LDMDB%%s %s%s, %s" (showRegister rd) (cond "!" "" bang) (showArmOpMultiple regs)
+showConditional (LDMIB bang rd regs)   = printf "LDMIB%%s %s%s, %s" (showRegister rd) (cond "!" "" bang) (showArmOpMultiple regs)
+showConditional (STM   bang rd regs)   = printf "STM%%s %s%s, %s"   (showRegister rd) (cond "!" "" bang) (showArmOpMultiple regs)
+showConditional (STMDA bang rd regs)   = printf "STMDA%%s %s%s, %s" (showRegister rd) (cond "!" "" bang) (showArmOpMultiple regs)
+showConditional (STMDB bang rd regs)   = printf "STMDB%%s %s%s, %s" (showRegister rd) (cond "!" "" bang) (showArmOpMultiple regs)
+showConditional (STMIB bang rd regs)   = printf "STMIB%%s %s%s, %s" (showRegister rd) (cond "!" "" bang) (showArmOpMultiple regs)
+showConditional (PUSH regs) = printf "PUSH%%s %s" (showArmOpMultiple regs)
+showConditional (POP  regs) = printf "POP%%s %s"  (showArmOpMultiple regs)
+showConditional (SWP  rt rt2 rn) = printf "SWP%%s %s, %s, %s"  (showRegister rt) (showRegister rt2) (showArmOpMemory rn)
+showConditional (SWPB rt rt2 rn) = printf "SWPB%%s %s, %s, %s" (showRegister rt) (showRegister rt2) (showArmOpMemory rn)
+showConditional (SMC imm) = printf "SMC%%s %i" imm
+showConditional (SVC imm) = printf "SVC%%s %i" imm
+showConditional (DBG imm) = printf "DBG%%s %i" imm
+showConditional (DMB opt) = printf "DMB%%s %s" (show opt) -- FIX
+showConditional (DSB opt) = printf "DSB%%s %s" (show opt) -- FIX
+showConditional (ISB opt) = printf "ISB%%s %s" (show opt) -- FIX
+showConditional (PLI mem) = printf "PLI%%s %s" (showArmOpMemory mem)
+showConditional YIELD = printf "YIELD"
+showConditional WFE = printf "WFE"
+showConditional WFI = printf "WFI"
+showConditional SEV = printf "SEV"
+showConditional (BFC rd x) = undefined -- FIX
+showConditional (BFI rd rn x) = undefined -- FIX
+showConditional (MLS rd rn rm) = undefined -- FIX
+showConditional (MOVW rd imm) = undefined
+showConditional (MOVT rd imm) = undefined
+showConditional (RBIT rd rm) = undefined
+showConditional i = error $ "Unrecognized instruction " ++ show i
 
-showArmInstruction (ARMUnconditionalInstruction x) = undefined --showArmUnconditionalOpcode x
-showArmInstruction (ARMConditionalInstruction cond x) = printf (showArmConditionalOpcode x) (showArmCondition cond)
--}
+showInstruction :: UALInstruction -> String
+showInstruction (Unconditional x) = undefined --showArmUnconditionalOpcode x
+showInstruction (Conditional cond x) = printf (showConditional x) (showCondition cond)
