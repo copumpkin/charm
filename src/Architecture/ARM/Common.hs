@@ -33,7 +33,7 @@ data ARMArch = ARM_EXT_V1
 
 data ARMRegister = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 
                  | R9 | R10 | R11 | R12 | SP | LR | PC
-  deriving (Show, Read, Eq, Enum)
+  deriving (Show, Read, Eq, Ord, Enum)
 
 data ARMShift = S_LSL | S_LSR | S_ASR | S_ROR
   deriving (Show, Read, Eq, Enum)
@@ -43,7 +43,7 @@ data Condition = EQ | NE | CS | CC | MI | PL | VS | VC
   deriving (Show, Read, Eq, Enum)
 
 data ARMStatusRegister = CPSR | SPSR
-  deriving (Show, Read, Eq, Enum)
+  deriving (Show, Read, Eq, Ord, Enum)
 
 data ARMEndian = Big | Little
   deriving (Show, Read, Eq, Enum)
