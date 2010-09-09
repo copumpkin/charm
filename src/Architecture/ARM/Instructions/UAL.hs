@@ -42,34 +42,34 @@ data Conditional = B Int32
                  | BX ARMRegister
                  | BXJ ARMRegister
                  
-                 | AND  ARMRegister ARMRegister ARMOpData -- AND, ANDS
-                 | ANDS ARMRegister ARMRegister ARMOpData -- NEW
-                 
-                 | EOR  ARMRegister ARMRegister ARMOpData -- EOR, EORS
-                 | EORS ARMRegister ARMRegister ARMOpData -- NEW
-                 
-                 | SUB  ARMRegister ARMRegister ARMOpData -- SUB, SUBS
-                 | SUBS ARMRegister ARMRegister ARMOpData -- NEW
-                 
-                 | RSB  ARMRegister ARMRegister ARMOpData -- RSB, RSBS
-                 | RSBS ARMRegister ARMRegister ARMOpData -- NEW
-                 
-                 | ADD  ARMRegister ARMRegister ARMOpData -- ADD, ADDS
-                 | ADDS ARMRegister ARMRegister ARMOpData -- NEW
-                 
-                 | ADC  ARMRegister ARMRegister ARMOpData -- ADC, ADCS
-                 | ADCS ARMRegister ARMRegister ARMOpData -- NEW
-                 
-                 | SBC  ARMRegister ARMRegister ARMOpData -- SBC, SBCS
-                 | SBCS ARMRegister ARMRegister ARMOpData -- NEW
-                 
-                 | RSC  ARMRegister ARMRegister ARMOpData -- RSC, RSCS
-                 | RSCS ARMRegister ARMRegister ARMOpData -- NEW
-                 
-                 | TST ARMRegister ARMOpData -- TST
-                 | TEQ ARMRegister ARMOpData -- TEQ
-                 | CMP ARMRegister ARMOpData -- CMP
-                 | CMN ARMRegister ARMOpData -- CMN
+                 | AND  ARMRegister ARMRegister ARMOpData
+                 | ANDS ARMRegister ARMRegister ARMOpData
+                                                         
+                 | EOR  ARMRegister ARMRegister ARMOpData
+                 | EORS ARMRegister ARMRegister ARMOpData
+                                                         
+                 | SUB  ARMRegister ARMRegister ARMOpData
+                 | SUBS ARMRegister ARMRegister ARMOpData
+                                                         
+                 | RSB  ARMRegister ARMRegister ARMOpData
+                 | RSBS ARMRegister ARMRegister ARMOpData
+                                                         
+                 | ADD  ARMRegister ARMRegister ARMOpData
+                 | ADDS ARMRegister ARMRegister ARMOpData
+                                                         
+                 | ADC  ARMRegister ARMRegister ARMOpData
+                 | ADCS ARMRegister ARMRegister ARMOpData
+                                                         
+                 | SBC  ARMRegister ARMRegister ARMOpData
+                 | SBCS ARMRegister ARMRegister ARMOpData
+                                                         
+                 | RSC  ARMRegister ARMRegister ARMOpData
+                 | RSCS ARMRegister ARMRegister ARMOpData
+                                                         
+                 | TST ARMRegister ARMOpData
+                 | TEQ ARMRegister ARMOpData
+                 | CMP ARMRegister ARMOpData
+                 | CMN ARMRegister ARMOpData
                  
                  | ORR  ARMRegister ARMRegister ARMOpData
                  | ORRS ARMRegister ARMRegister ARMOpData
@@ -145,16 +145,16 @@ data Conditional = B Int32
                  | SMUAD  ARMRegister ARMRegister ARMRegister
                  | SMUADX ARMRegister ARMRegister ARMRegister
                  
-                 | SMULBB ARMRegister ARMRegister ARMRegister -- NEW
-                 | SMULBT ARMRegister ARMRegister ARMRegister -- NEW
-                 | SMULTB ARMRegister ARMRegister ARMRegister -- NEW
-                 | SMULTT ARMRegister ARMRegister ARMRegister -- NEW
+                 | SMULBB ARMRegister ARMRegister ARMRegister
+                 | SMULBT ARMRegister ARMRegister ARMRegister
+                 | SMULTB ARMRegister ARMRegister ARMRegister
+                 | SMULTT ARMRegister ARMRegister ARMRegister
                  
                  | SMULL  ARMRegister ARMRegister ARMRegister ARMRegister
                  | SMULLS ARMRegister ARMRegister ARMRegister ARMRegister                          
                                   
-                 | SMULWB ARMRegister ARMRegister ARMRegister -- NEW
-                 | SMULWT ARMRegister ARMRegister ARMRegister -- NEW
+                 | SMULWB ARMRegister ARMRegister ARMRegister
+                 | SMULWT ARMRegister ARMRegister ARMRegister
                  
                  | SMUSD  ARMRegister ARMRegister ARMRegister
                  | SMUSDX ARMRegister ARMRegister ARMRegister
@@ -259,7 +259,7 @@ data Conditional = B Int32
                  | LDRSH ARMRegister ARMOpMemory 
                  
                  
-                 | STR  ARMRegister ARMOpMemory -- STR, STRB, STRH, STRD, STRT, STRBT
+                 | STR  ARMRegister ARMOpMemory
                  | STRB ARMRegister ARMOpMemory
                  | STRH ARMRegister ARMOpMemory
                  | STRD ARMRegister ARMOpMemory

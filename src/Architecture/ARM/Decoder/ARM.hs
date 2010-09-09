@@ -182,10 +182,10 @@ reg16_reg0_reg8 f = f <$> reg 16 <*> reg 0 <*> reg 8
 reg16_reg0_reg8_reg12 f = reg16_reg0_reg8 f <*> reg 12
 
 direction :: Int -> D ARMDirection
-direction n = choose n Increment Decrement
+direction n = choose n Decrement Increment
 
 order :: Int -> D ARMOrder
-order n = choose n Before After
+order n = choose n After Before
 
 choose :: Int -> a -> a -> Word32 -> a
 choose n t f x = if not (bool n x) then t else f
