@@ -21,7 +21,9 @@ import Data.Maybe
 import Text.Printf
 
 ualMatches :: Word32 -> UALInstruction -> String -> Assertion
-ualMatches off Undefined s = assertBool ("undefined mismatch with " ++ show s) ("invalid" `isInfixOf` s || "undefined" `isInfixOf` s)
+ualMatches off i@(Conditional _ _) s | "invalid" `isInfixOf` s || "undefined" `isInfixOf` s = assertFailure (printf "invalid instruction '%s' decoded to '%s'" s (showInstruction i))
+ualMatches off i@(Unconditional _) s | "invalid" `isInfixOf` s || "undefined" `isInfixOf` s = assertFailure (printf "invalid instruction '%s' decoded to '%s'" s (showInstruction i))
+ualMatches off Undefined s = assertBool "" True
 ualMatches off (Conditional cond (B op)) s = map toLower (showInstruction (Conditional cond (B $ op + (fromIntegral off)))) @?= s
 ualMatches off (Conditional cond (BL op)) s = map toLower (showInstruction (Conditional cond (BL $ op + (fromIntegral off)))) @?= s
 ualMatches off (Unconditional (BLXUC op)) s = map toLower (showInstruction (Unconditional (BLXUC $ op + (fromIntegral off)))) @?= s
@@ -34,3 +36,38 @@ main =
      let ours = map armDecode ws
      let tests = zipWith4 (\off w o u -> testCase (printf "0x%08x: 0x%08x %s" off w u) (ualMatches off o u)) [0,4..] ws ours insns
      defaultMain [testGroup "Instructions from objdump" tests]
+
+{-
+  0x00000f98: 0x912d1fcf smlawtls sp, pc, pc, r1: [Failed]
+Failed: expected: "smlawtls sp, pc, pc, r1"
+ but got: "teqls sp, pc, asr #31"
+
+  0x00000f8c: 0x70ff52db ldrsbtvc r5, [pc, #43]: [Failed]
+Failed: expected: "ldrsbtvc r5, [pc, #43]"
+ but got: "ldrsbvc r5, [pc, #43]"
+ 
+   0x00000f64: 0xc0f054f4 ldrshtgt r5, [r0], #68: [Failed]
+ Failed: expected: "ldrshtgt r5, [r0], #68"
+  but got: "ldrhgt r5, [r0, #68]"
+
+  0x00000e60: 0x731cf21e tstpvc ip, #-536870911: [Failed]
+Failed: expected: "tstpvc ip, #-536870911"
+ but got: "tstvc ip, #-536870911"
+
+  0x00000e2c: 0x7006dcb6 strhvc sp, [r6], -r6: [Failed]
+Failed: expected: "strhvc sp, [r6], -r6"
+ but got: "andvc sp, r6, r6, lsr ip"
+
+  0x00000c80: 0x307c1fd2 ldrsbtcc r1, [ip], #-242: [Failed]
+Failed: expected: "ldrsbtcc r1, [ip], #-242"
+ but got: "ldrsbcc r1, [ip, #-242]"
+
+  0x00000ba0: 0x61dc5afb ldrshvs r5, [ip, #171]: [Failed]
+Failed: expected: "ldrshvs r5, [ip, #171]"
+ but got: "ldrhvs r5, [ip, #171]"
+
+  0x00000954: 0xd0e9809f smlalle r8, r9, pc, r0: [Failed]
+Failed: expected: "smlalle r8, r9, pc, r0"
+ but got: "rscle r8, r9, pc, lsl r0"
+
+-}

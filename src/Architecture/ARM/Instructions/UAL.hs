@@ -13,9 +13,9 @@ data ARMOpRegister = Reg ARMRegister
   deriving (Show, Read, Eq)
 -}
 
-data ARMOpData = Imm Int
+data ARMOpData = Imm Int32
                | Reg ARMRegister
-               | RegShiftImm ARMShift Int ARMRegister 
+               | RegShiftImm ARMShift Int32 ARMRegister 
                | RegShiftReg ARMShift ARMRegister ARMRegister
                | RegShiftRRX ARMRegister
   deriving (Show, Read, Eq)

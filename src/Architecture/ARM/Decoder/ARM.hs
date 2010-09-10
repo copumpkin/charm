@@ -39,25 +39,47 @@ instance Decoder Word32 UALInstruction where
 bitRange :: (Integral a, Bits a, Integral b) => Int -> Int -> a -> b
 bitRange start end i = fromIntegral ((((fromIntegral i :: Integer) `shiftR` start) .&. ((2 `shiftL` (end - start)) - 1)))
 
+allSet :: Int -> Int -> Word32 -> Bool
+allSet start end = (== (((2 :: Word32) `shiftL` (end - start)) - 1)) . bitRange start end
 
+armDecodeAddress' :: D ARMOpMemory
+armDecodeAddress' =
+  do flag   <- bool 25
+     pcrel  <- (&& not flag) <$> allSet 16 19
+     post   <- not <$> bool 24
+     neg    <- bool 23
+     offset <- fromIntegral . (.&. 0xfff)
+     base   <- reg 16
+     let memReg = if neg then MemRegNeg else MemReg
+         memRegPost = if neg then MemRegPostNeg else MemRegPost
+         mem = if post then (\r o b -> memRegPost r o) else memReg
+     if pcrel -- is this special case necessary?
+       then
+         mem PC (Imm offset) <$> bool 21  
+       else
+         if flag
+           then
+             mem base <$> flip armDecodeShift False <*> bool 21 
+           else
+             mem base (Imm offset) <$> bool 21
+
+-- These things need to be tested!!
 armDecodeAddress :: D ARMOpMemory
-armDecodeAddress a | (a .&. 0xf0000) == 0xf0000 && (a .&. 0x2000000) == 0 = 
+armDecodeAddress a | (a .&. 0xf0000) == 0xf0000 && not (bool 25 a) = 
                          let offset = a .&. 0xfff in
-                           case a .&. 0x1000000 /= 0 of
-                             True -> MemReg PC (Imm (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset)) ((a .&. 0x200000) /= 0)
+                           case bool 24 a of
+                             True -> MemReg PC (Imm ((if not (bool 23 a) then negate else id) (fromIntegral offset))) (bool 21 a)
                              _    -> MemRegPost PC $ Imm (fromIntegral offset)
                    | otherwise = 
-                         let baseReg = (toEnum (((fromIntegral a) `shiftR` 16 ) .&. 0xf)) in case a .&. 0x1000000 /= 0 of
-                           False -> if (a .&. 0x2000000) == 0 then
+                         let baseReg = (toEnum (((fromIntegral a) `shiftR` 16 ) .&. 0xf)) in case bool 24 a of
+                           False -> if not (bool 25 a) then
                                       let offset = a .&. 0xfff in
-                                        if offset /= 0 then
-                                          MemRegPost baseReg $ Imm (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset)
-                                          else MemRegPost baseReg $ Imm 0
-                                      else (if (a .&. 0x800000) == 0 then MemRegPostNeg else MemRegPost) baseReg (armDecodeShift a False)
-                           _     -> if (a .&. 0x2000000) == 0 then
+                                        MemRegPost baseReg $ Imm ((if not (bool 23 a) then negate else id) (fromIntegral offset))
+                                      else (if not (bool 23 a) then MemRegPostNeg else MemRegPost) baseReg (armDecodeShift a False)
+                           _     -> if not (bool 25 a) then
                                       let offset = a .&. 0xfff in
-                                        MemReg baseReg (Imm (if (a .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset)) ((a .&. 0x200000) /= 0)
-                                      else (if (a .&. 0x800000) == 0 then MemRegNeg else MemReg) baseReg (armDecodeShift a False) ((a .&. 0x200000) /= 0)
+                                        MemReg baseReg (Imm (if not (bool 23 a) then -(fromIntegral offset) else fromIntegral offset)) (bool 21 a)
+                                      else (if not (bool 23 a) then MemRegNeg else MemReg) baseReg (armDecodeShift a False) (bool 21 a)
 
 armDecodeShift :: Word32 -> Bool -> ARMOpData
 armDecodeShift i p =  if i .&. 0xff0 /= 0 then
@@ -201,8 +223,8 @@ armOpcodes =
   , decoder [ARM_EXT_V2]    0x00000090 0x0fe000f0 (mul <$> bool 20 <*> reg 16 <*> reg 0 <*> reg 8)
   , decoder [ARM_EXT_V2]    0x00200090 0x0fe000f0 (mla <$> bool 20 <*> reg 16 <*> reg 0 <*> reg 8 <*> reg 12)
   , decoder [ARM_EXT_V2S]   0x01000090 0x0fb00ff0 (swp <$> bool 22 <*> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure32 (Imm 0) <*> pure32 False))
-  , decoder [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (choose 22 smull umull <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
-  , decoder [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (choose 22 smlal umlal <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
+  , decoder [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (choose 22 umull smull <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
+  , decoder [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (choose 22 umlal smlal <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
 
   , decoder [ARM_EXT_V7]    0xf450f000 0xfd70f000 (PLI <$> arm_P)
   , decoder [ARM_EXT_V7]    0x0320f0f0 0x0ffffff0 (DBG <$> integral 0 3)
