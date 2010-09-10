@@ -36,8 +36,8 @@ instance Decoder Word32 UALInstruction where
   decoder = ARMDecoder
 
 
-bitRange :: (Integral a, Bits a) => Int -> Int -> a -> a
-bitRange start end i = ((i `shiftR` start) .&. ((2 `shiftL` (end - start)) - 1))
+bitRange :: (Integral a, Bits a, Integral b) => Int -> Int -> a -> b
+bitRange start end i = fromIntegral ((((fromIntegral i :: Integer) `shiftR` start) .&. ((2 `shiftL` (end - start)) - 1)))
 
 
 armDecodeAddress :: D ARMOpMemory
@@ -66,7 +66,7 @@ armDecodeShift i p =  if i .&. 0xff0 /= 0 then
                               shift = ((fromIntegral i) .&. 0x60) `shiftR` 5 in
                             if amount == 0 && shift == 3 then  RegShiftRRX (toEnum ((fromIntegral i) .&. 0xf)) 
                               else  RegShiftImm (toEnum shift) (fromIntegral amount) (toEnum ((fromIntegral i) .&. 0xf)) 
-                          else  RegShiftImm (toEnum (((fromIntegral i) .&. 0x60) `shiftR` 5)) (toEnum (((fromIntegral i) .&. 0xf00 `shiftR` 8))) (toEnum ((fromIntegral i) .&. 0xf)) 
+                          else  RegShiftReg (toEnum (((fromIntegral i) .&. 0x60) `shiftR` 5)) (toEnum ((((fromIntegral i) .&. 0xf00) `shiftR` 8))) (toEnum ((fromIntegral i) .&. 0xf)) 
                         else Reg (toEnum ((fromIntegral i) .&. 0xf))
 
 arm_a :: D ARMOpMemory
@@ -115,10 +115,10 @@ arm_e :: D Word32
 arm_e i = (i .&. 0xf) .|. ((i .&. 0xfff00) `shiftR` 4)
 
 arm_B :: D Int32
-arm_B = do x <- choose 23 0 0xff
+arm_B = do x <- choose 23 0 0xff000000 -- negative bit
            y <- integral 0 23
            let offset = (x + y :: Int32) `shiftL` 2
-           z <- choose 24 0 2
+           z <- choose 24 0 2 -- 2
            return (fromIntegral (offset + 8 + z)) -- FIXME: Do I want that +8 in there? Or should I deal with it later
             
          
@@ -141,13 +141,13 @@ arm_P :: D ARMOpMemory
 arm_P i = armDecodeAddress $ i .|. (1 `shiftL` 24)
 
 reg :: Int -> D ARMRegister
-reg start i = toEnum (bitRange start (start + 3) $ fromIntegral i)
+reg start i = toEnum (bitRange start (start + 3)i)
 
 integral :: (Integral a, Bits a) => Int -> Int -> D a
-integral start end i = bitRange start end $ fromIntegral i
+integral start end i = bitRange start end i
 
 integral' :: (Integral a, Bits a) => Int -> Int -> D a
-integral' start end i = (+1) . bitRange start end $ fromIntegral i
+integral' start end i = (+1) . bitRange start end $ i
 
 arm_X :: Int -> Int -> D Word32
 arm_X start end i = (.&. 0xf) . bitRange start end $ i
@@ -171,8 +171,8 @@ bool b s = bit b s == 1
 enum :: (Integral i, Enum a) => i -> a
 enum = toEnum . fromIntegral
 
-arm_bw bit = choose bit Word Byte
-arm_bh bit = choose bit Halfword Byte
+arm_bw bit = choose bit Word Byte 
+arm_bh bit = choose bit Byte Halfword
 
 reg12_reg0_reg16 f = f <$> reg 12 <*> reg 0 <*> reg 16
 
@@ -359,10 +359,10 @@ armOpcodes =
   , decoder [ARM_EXT_V6]    0x00400090 0x0ff000f0 (UMAAL  <$> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
   , decoder [ARM_EXT_V6]    0x0780f010 0x0ff0f0f0 (reg16_reg0_reg8 $ USAD8 )
   , decoder [ARM_EXT_V6]    0x07800010 0x0ff000f0 (reg16_reg0_reg8_reg12 $ USADA8)
-  , decoder [ARM_EXT_V6]    0x06e00010 0x0fe00ff0 (USAT   <$> reg 12 <*> integral' 16 20 <*> (Reg <$> reg 0))
-  , decoder [ARM_EXT_V6]    0x06e00010 0x0fe00070 (USAT   <$> reg 12 <*> integral' 16 20 <*> (RegShiftImm S_LSL <$> integral 7 11 <*> reg 0))
-  , decoder [ARM_EXT_V6]    0x06e00050 0x0fe00070 (USAT   <$> reg 12 <*> integral' 16 20 <*> (RegShiftImm S_ASR <$> integral 7 11 <*> reg 0))
-  , decoder [ARM_EXT_V6]    0x06e00f30 0x0ff00ff0 (USAT16 <$> reg 12 <*> integral' 16 19 <*> reg 0)
+  , decoder [ARM_EXT_V6]    0x06e00010 0x0fe00ff0 (USAT   <$> reg 12 <*> integral 16 20 <*> (Reg <$> reg 0))
+  , decoder [ARM_EXT_V6]    0x06e00010 0x0fe00070 (USAT   <$> reg 12 <*> integral 16 20 <*> (RegShiftImm S_LSL <$> integral 7 11 <*> reg 0))
+  , decoder [ARM_EXT_V6]    0x06e00050 0x0fe00070 (USAT   <$> reg 12 <*> integral 16 20 <*> (RegShiftImm S_ASR <$> integral 7 11 <*> reg 0))
+  , decoder [ARM_EXT_V6]    0x06e00f30 0x0ff00ff0 (USAT16 <$> reg 12 <*> integral 16 19 <*> reg 0)
  
   , decoder [ARM_EXT_V5J]   0x012fff20 0x0ffffff0 (BXJ <$> reg 0)
  
@@ -523,7 +523,7 @@ armOpcodes =
 
   , decoder [ARM_EXT_V1]    0x092d0000 0x0fff0000 (PUSH <$> (Regs <$> arm_m))
   , decoder [ARM_EXT_V1]    0x08800000 0x0ff00000 (STM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m))
-  , decoder [ARM_EXT_V1]    0x08000000 0x0e100000 (ldm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
+  , decoder [ARM_EXT_V1]    0x08000000 0x0e100000 (stm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
   , decoder [ARM_EXT_V1]    0x08bd0000 0x0fff0000 (POP <$> (Regs <$> arm_m))
   , decoder [ARM_EXT_V1]    0x08900000 0x0f900000 (LDM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m))
   , decoder [ARM_EXT_V1]    0x08100000 0x0e100000 (ldm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
@@ -535,3 +535,7 @@ armOpcodes =
 
 armDecode :: Word32 -> UALInstruction
 armDecode i = fromMaybe Undefined . fmap (armDecodeOp i) . find (armOpcodeMatches i) $ armOpcodes
+
+armDecodeDbg :: Word32 -> (UALInstruction, Word32, Word32)
+armDecodeDbg i = case fromJust . find (armOpcodeMatches i) $ armOpcodes of
+                    ARMDecoder a b c d -> (armDecode i, b, c)
