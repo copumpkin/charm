@@ -533,5 +533,5 @@ armOpcodes =
   , decoder [ARM_EXT_V1]    0x00000000 0x00000000 (pure32 Undefined)
   ]
 
-armDecode :: Word32 -> Maybe UALInstruction
-armDecode i = fmap (armDecodeOp i) . find (armOpcodeMatches i) $ armOpcodes
+armDecode :: Word32 -> UALInstruction
+armDecode i = fromMaybe Undefined . fmap (armDecodeOp i) . find (armOpcodeMatches i) $ armOpcodes

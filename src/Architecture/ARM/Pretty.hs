@@ -12,26 +12,22 @@ import Data.List
 
 -- All this string building is inefficient. Fix it sometime using a real prettyprinting library
 
-{-
-showRegister R0  = "r0"
-showRegister R1  = "r1"
-showRegister R2  = "r2"
-showRegister R3  = "r3"
-showRegister R4  = "r4"
-showRegister R5  = "r5"
-showRegister R6  = "r6"
-showRegister R7  = "r7"
-showRegister R8  = "r8"
-showRegister R9  = "r9"
-showRegister R10 = "r10"
-showRegister R11 = "r11"
-showRegister R12 = "r12"
-showRegister SP  = "sp"
-showRegister LR  = "lr"
-showRegister PC  = "pc"
--}
-
-showRegister = show
+showRegister R0  = "R0"
+showRegister R1  = "R1"
+showRegister R2  = "R2"
+showRegister R3  = "R3"
+showRegister R4  = "R4"
+showRegister R5  = "R5"
+showRegister R6  = "R6"
+showRegister R7  = "R7"
+showRegister R8  = "R8"
+showRegister R9  = "R9"
+showRegister R10 = "SL"
+showRegister R11 = "FP"
+showRegister R12 = "IP"
+showRegister SP  = "SP"
+showRegister LR  = "LR"
+showRegister PC  = "PC"
 
 showArmShift S_LSL = "LSL"
 showArmShift S_LSR = "LSR"
@@ -76,8 +72,8 @@ showArmOpMultiple (Regs rs) = "{" ++ (intercalate ", " . map showRegister $ rs) 
 showArmOpMultiple (RegsCaret rs) = "{" ++ (intercalate ", " . map showRegister $ rs) ++ "}^"
 
 showConditional :: Conditional -> String
-showConditional (B off)  = printf "B%%s %i" off
-showConditional (BL off) = printf "BL%%s %i" off
+showConditional (B off)  = printf "B%%s 0x%x" off
+showConditional (BL off) = printf "BL%%s 0x%x" off
 showConditional (BLX rd) = printf "BLX%%s %s" (showRegister rd)
 showConditional (BX  rd) = printf "BX%%s %s"  (showRegister rd)
 showConditional (BXJ rd) = printf "BXJ%%s %s" (showRegister rd)
@@ -271,9 +267,9 @@ showConditional (PUSH regs) = printf "PUSH%%s %s" (showArmOpMultiple regs)
 showConditional (POP  regs) = printf "POP%%s %s"  (showArmOpMultiple regs)
 showConditional (SWP  rt rt2 rn) = printf "SWP%%s %s, %s, %s"  (showRegister rt) (showRegister rt2) (showArmOpMemory rn)
 showConditional (SWPB rt rt2 rn) = printf "SWPB%%s %s, %s, %s" (showRegister rt) (showRegister rt2) (showArmOpMemory rn)
-showConditional (SMC imm) = printf "SMC%%s %i" imm
-showConditional (SVC imm) = printf "SVC%%s %i" imm
-showConditional (DBG imm) = printf "DBG%%s %i" imm
+showConditional (SMC imm) = printf "SMC%%s 0x%08x" imm
+showConditional (SVC imm) = printf "SVC%%s 0x%08x" imm
+showConditional (DBG imm) = printf "DBG%%s 0x%08x" imm
 showConditional (DMB opt) = printf "DMB%%s %s" (show opt) -- FIX
 showConditional (DSB opt) = printf "DSB%%s %s" (show opt) -- FIX
 showConditional (ISB opt) = printf "ISB%%s %s" (show opt) -- FIX
