@@ -42,20 +42,29 @@ bitRange start end i = fromIntegral ((((fromIntegral i :: Integer) `shiftR` star
 allSet :: Int -> Int -> Word32 -> Bool
 allSet start end = (== (((2 :: Word32) `shiftL` (end - start)) - 1)) . bitRange start end
 
-armDecodeAddress' :: D ARMOpMemory
-armDecodeAddress' =
+flatten :: ARMOpMemory -> ARMOpMemory
+flatten (MemRegNeg x (Imm z) y) = MemReg x (Imm $ negate z) y
+flatten (MemRegPostNeg x (Imm z)) = MemRegPost x (Imm $ negate z)
+flatten x = x
+
+armDecodeAddress :: D ARMOpMemory
+armDecodeAddress =
   do flag   <- bool 25
      pcrel  <- (&& not flag) <$> allSet 16 19
      post   <- not <$> bool 24
-     neg    <- bool 23
+     neg    <- not <$> bool 23
      offset <- fromIntegral . (.&. 0xfff)
      base   <- reg 16
      let memReg = if neg then MemRegNeg else MemReg
          memRegPost = if neg then MemRegPostNeg else MemRegPost
-         mem = if post then (\r o b -> memRegPost r o) else memReg
+         mem = if post then (const .) . memRegPost else memReg
      if pcrel -- is this special case necessary?
        then
-         mem PC (Imm offset) <$> bool 21  
+         if post
+           then
+             return $ MemRegPost PC (Imm offset) -- Is this right?
+           else
+             memReg PC (Imm offset) <$> bool 21
        else
          if flag
            then
@@ -63,23 +72,6 @@ armDecodeAddress' =
            else
              mem base (Imm offset) <$> bool 21
 
--- These things need to be tested!!
-armDecodeAddress :: D ARMOpMemory
-armDecodeAddress a | (a .&. 0xf0000) == 0xf0000 && not (bool 25 a) = 
-                         let offset = a .&. 0xfff in
-                           case bool 24 a of
-                             True -> MemReg PC (Imm ((if not (bool 23 a) then negate else id) (fromIntegral offset))) (bool 21 a)
-                             _    -> MemRegPost PC $ Imm (fromIntegral offset)
-                   | otherwise = 
-                         let baseReg = (toEnum (((fromIntegral a) `shiftR` 16 ) .&. 0xf)) in case bool 24 a of
-                           False -> if not (bool 25 a) then
-                                      let offset = a .&. 0xfff in
-                                        MemRegPost baseReg $ Imm ((if not (bool 23 a) then negate else id) (fromIntegral offset))
-                                      else (if not (bool 23 a) then MemRegPostNeg else MemRegPost) baseReg (armDecodeShift a False)
-                           _     -> if not (bool 25 a) then
-                                      let offset = a .&. 0xfff in
-                                        MemReg baseReg (Imm (if not (bool 23 a) then -(fromIntegral offset) else fromIntegral offset)) (bool 21 a)
-                                      else (if not (bool 23 a) then MemRegNeg else MemReg) baseReg (armDecodeShift a False) (bool 21 a)
 
 armDecodeShift :: Word32 -> Bool -> ARMOpData
 armDecodeShift i p =  if i .&. 0xff0 /= 0 then
@@ -92,7 +84,7 @@ armDecodeShift i p =  if i .&. 0xff0 /= 0 then
                         else Reg (toEnum ((fromIntegral i) .&. 0xf))
 
 arm_a :: D ARMOpMemory
-arm_a = armDecodeAddress 
+arm_a = flatten . armDecodeAddress
 
 -- FIXME: wow, this is pretty ugly...
 arm_s :: D ARMOpMemory
