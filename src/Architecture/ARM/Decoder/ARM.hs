@@ -42,6 +42,9 @@ bitRange start end i = fromIntegral ((((fromIntegral i :: Integer) `shiftR` star
 allSet :: Int -> Int -> Word32 -> Bool
 allSet start end = (== (((2 :: Word32) `shiftL` (end - start)) - 1)) . bitRange start end
 
+noneSet :: Int -> Int -> Word32 -> Bool
+noneSet start end = (== 0) . bitRange start end
+
 flatten :: ARMOpMemory -> ARMOpMemory
 flatten (MemRegNeg x (Imm z) y) = MemReg x (Imm $ negate z) y
 flatten (MemRegPostNeg x (Imm z)) = MemRegPost x (Imm $ negate z)
@@ -53,7 +56,7 @@ armDecodeAddress =
      pcrel  <- (&& not flag) <$> allSet 16 19
      post   <- not <$> bool 24
      neg    <- not <$> bool 23
-     offset <- fromIntegral . (.&. 0xfff)
+     offset <- integral 0 11
      base   <- reg 16
      let memReg = if neg then MemRegNeg else MemReg
          memRegPost = if neg then MemRegPostNeg else MemRegPost
@@ -73,15 +76,20 @@ armDecodeAddress =
              mem base (Imm offset) <$> bool 21
 
 
-armDecodeShift :: Word32 -> Bool -> ARMOpData
-armDecodeShift i p =  if i .&. 0xff0 /= 0 then
-                        if i .&. 0x10 == 0 then
-                          let amount = (i .&. 0xf80) `shiftR` 7
-                              shift = ((fromIntegral i) .&. 0x60) `shiftR` 5 in
-                            if amount == 0 && shift == 3 then  RegShiftRRX (toEnum ((fromIntegral i) .&. 0xf)) 
-                              else  RegShiftImm (toEnum shift) (fromIntegral amount) (toEnum ((fromIntegral i) .&. 0xf)) 
-                          else  RegShiftReg (toEnum (((fromIntegral i) .&. 0x60) `shiftR` 5)) (toEnum ((((fromIntegral i) .&. 0xf00) `shiftR` 8))) (toEnum ((fromIntegral i) .&. 0xf)) 
-                        else Reg (toEnum ((fromIntegral i) .&. 0xf))
+armDecodeShift :: D ARMOpData
+armDecodeShift i = let shift = toEnum $ integral 5 6 i in
+                     if not (noneSet 4 11 i) then
+                       if not (bool 4 i) then
+                         let amount = integral 7 11 i in
+                           if amount == 0 && shift == S_ROR
+                             then  
+                               RegShiftRRX (reg 0 i)
+                             else  
+                               RegShiftImm shift amount (reg 0 i)
+                         else
+                           RegShiftReg shift (reg 8 i) (reg 0 i)
+                       else 
+                         Reg (reg 0 i)
 
 arm_a :: D ARMOpMemory
 arm_a = flatten . armDecodeAddress
