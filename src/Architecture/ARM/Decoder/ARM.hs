@@ -71,7 +71,7 @@ armDecodeAddress =
        else
          if flag
            then
-             mem base <$> flip armDecodeShift False <*> bool 21 
+             mem base <$> armDecodeShift <*> bool 21 
            else
              mem base (Imm offset) <$> bool 21
 
@@ -122,7 +122,7 @@ arm_m i = catMaybes $ map (\x -> if i .&. (1 `shiftL` x) /= 0 then Just $ toEnum
 
 arm_o :: D ARMOpData
 arm_o i | i .&. 0x2000000 /= 0 = Imm . fromIntegral $ (i .&. 0xff) `rotateR` (((fromIntegral i) .&. 0xf00) `shiftR` 7)
-        | otherwise = armDecodeShift i True
+        | otherwise = armDecodeShift i
 
 arm_p :: D Bool
 arm_p i = i .&. 0xf000 == 0xf000
@@ -131,7 +131,7 @@ arm_t :: D Bool
 arm_t i = i .&. 0x1200000 == 0x200000
 
 arm_q :: D ARMOpData
-arm_q i = armDecodeShift i False
+arm_q i = armDecodeShift i
 
 arm_e :: D Word32
 arm_e i = (i .&. 0xf) .|. ((i .&. 0xfff00) `shiftR` 4)
