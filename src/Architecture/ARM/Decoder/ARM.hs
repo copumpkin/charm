@@ -210,7 +210,7 @@ armOpcodes =
   , decoder [ARM_EXT_V2]    0x00200090 0x0fe000f0 (mla <$> bool 20 <*> reg 16 <*> reg 0 <*> reg 8 <*> reg 12)
   , decoder [ARM_EXT_V2S]   0x01000090 0x0fb00ff0 (swp <$> bool 22 <*> reg 12 <*> reg 0 <*> (MemReg <$> reg 16 <*> pure32 (Imm 0) <*> pure32 False))
   , decoder [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (choose 22 umull smull <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
-  , decoder [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (choose 22 umlal smlal <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
+  , decoder [ARM_EXT_V3M]   0x00a00090 0x0fa000f0 (choose 22 umlal smlal <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
 
   , decoder [ARM_EXT_V7]    0xf450f000 0xfd70f000 (PLI <$> arm_P)
   , decoder [ARM_EXT_V7]    0x0320f0f0 0x0ffffff0 (DBG <$> integral 0 3)
@@ -382,13 +382,14 @@ armOpcodes =
   , decoder [ARM_EXT_V5E]   0x000000d0 0x0e1000f0 (LDRD <$> reg 12 <*> arm_s)
   , decoder [ARM_EXT_V5E]   0x000000f0 0x0e1000f0 (STRD <$> reg 12 <*> arm_s)
   , decoder [ARM_EXT_V5E]   0xf450f000 0xfc70f000 (PLD <$> arm_a)
+  
   , decoder [ARM_EXT_V5ExP] 0x01000080 0x0ff000f0 (reg16_reg0_reg8_reg12 $ SMLABB)
   , decoder [ARM_EXT_V5ExP] 0x010000a0 0x0ff000f0 (reg16_reg0_reg8_reg12 $ SMLATB)
   , decoder [ARM_EXT_V5ExP] 0x010000c0 0x0ff000f0 (reg16_reg0_reg8_reg12 $ SMLABT)
   , decoder [ARM_EXT_V5ExP] 0x010000e0 0x0ff000f0 (reg16_reg0_reg8_reg12 $ SMLATT)
   
-  , decoder [ARM_EXT_V5ExP] 0x01400080 0x0ff000f0 (reg12_reg16_reg0_reg8 $ SMLAWB)
-  , decoder [ARM_EXT_V5ExP] 0x014000a0 0x0ff000f0 (reg12_reg16_reg0_reg8 $ SMLAWT)
+  , decoder [ARM_EXT_V5ExP] 0x01200080 0x0ff000f0 (reg16_reg0_reg8_reg12 $ SMLAWB)
+  , decoder [ARM_EXT_V5ExP] 0x012000c0 0x0ff000f0 (reg16_reg0_reg8_reg12 $ SMLAWT)
   
   , decoder [ARM_EXT_V5ExP] 0x01400080 0x0ff000f0 (reg12_reg16_reg0_reg8 $ SMLALBB)
   , decoder [ARM_EXT_V5ExP] 0x014000a0 0x0ff000f0 (reg12_reg16_reg0_reg8 $ SMLALTB)
@@ -409,93 +410,80 @@ armOpcodes =
   , decoder [ARM_EXT_V5ExP] 0x01600050 0x0ff00ff0 (reg12_reg0_reg16 $ QDSUB)
   
   -- This matches arm-dis.c, but is it right? It doesn't match encoding A1 or A2 in the reference
-  , decoder [ARM_EXT_V1] 0x052d0004 0x0fff0fff (PUSH <$> Regs <$> (pure <$> reg 12)) 
-  
-  , decoder [ARM_EXT_V1] 0x04400000 0x0e500000 (str Byte <$> arm_t <*> reg 12 <*> arm_a) -- "strb%t%c\t%12-15R, %a"},
-  , decoder [ARM_EXT_V1] 0x04000000 0x0e500000 (str Word <$> arm_t <*> reg 12 <*> arm_a) -- "str%t%c\t%12-15r, %a"},
-  , decoder [ARM_EXT_V1] 0x06400000 0x0e500ff0 (str Byte <$> arm_t <*> reg 12 <*> arm_a) -- "strb%t%c\t%12-15R, %a"},
-  , decoder [ARM_EXT_V1] 0x06000000 0x0e500ff0 (str Word <$> arm_t <*> reg 12 <*> arm_a) -- "str%t%c\t%12-15r, %a"},
-  , decoder [ARM_EXT_V1] 0x04400000 0x0c500010 (str Byte <$> arm_t <*> reg 12 <*> arm_a) -- "strb%t%c\t%12-15R, %a"},
-  , decoder [ARM_EXT_V1] 0x04000000 0x0c500010 (str Word <$> arm_t <*> reg 12 <*> arm_a) -- "str%t%c\t%12-15r, %a"},
-  
-  , decoder [ARM_EXT_V1] 0x04400000 0x0e500000 (STRB <$> reg 12 <*> arm_a) -- "strb%c\t%12-15R, %a"},
-  , decoder [ARM_EXT_V1] 0x06400000 0x0e500010 (STRB <$> reg 12 <*> arm_a) -- "strb%c\t%12-15R, %a"},
-  , decoder [ARM_EXT_V1] 0x004000b0 0x0e5000f0 (STRH <$> reg 12 <*> arm_s) -- "strh%c\t%12-15R, %s"},
-  , decoder [ARM_EXT_V1] 0x000000b0 0x0e500ff0 (STRH <$> reg 12 <*> arm_s) -- "strh%c\t%12-15R, %s"},
-  
-  , decoder [ARM_EXT_V1] 0x00500090 0x0e5000f0 (pure32 Undefined)
-  , decoder [ARM_EXT_V1] 0x00500090 0x0e500090 (ldr <$> arm_bh 5 <*> pure32 False <*> bool 6 <*> reg 12 <*> arm_s) -- "ldr%6's%5?hb%c\t%12-15R, %s"},
-  , decoder [ARM_EXT_V1] 0x00100090 0x0e500ff0 (pure32 Undefined)
-  , decoder [ARM_EXT_V1] 0x00100090 0x0e500f90 (ldr <$> arm_bh 5 <*> pure32 False <*> bool 6 <*> reg 12 <*> arm_s) -- "ldr%6's%5?hb%c\t%12-15R, %s"},
-  
-  , decoder [ARM_EXT_V1]    0x00000000 0x0de00000 (bool20_reg12_reg16_o $ and)
-  --{ARM_EXT_V1, 0x02000000, 0x0fe00000, "and%20's%c\t%12-15r, %16-19r, %o"},
-  --{ARM_EXT_V1, 0x00000000, 0x0fe00010, "and%20's%c\t%12-15r, %16-19r, %o"},
-  --{ARM_EXT_V1, 0x00000010, 0x0fe00090, "and%20's%c\t%12-15R, %16-19R, %o"}, 
-
-  , decoder [ARM_EXT_V1]    0x00200000 0x0de00000 (bool20_reg12_reg16_o $ eor)
-  -- {ARM_EXT_V1, 0x02200000, 0x0fe00000, "eor%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00200000, 0x0fe00010, "eor%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00200010, 0x0fe00090, "eor%20's%c\t%12-15R, %16-19R, %o"},
-
-  , decoder [ARM_EXT_V1]    0x00400000 0x0de00000 (bool20_reg12_reg16_o $ sub)
-  -- {ARM_EXT_V1, 0x02400000, 0x0fe00000, "sub%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00400000, 0x0fe00010, "sub%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00400010, 0x0fe00090, "sub%20's%c\t%12-15R, %16-19R, %o"},
-
-  , decoder [ARM_EXT_V1]    0x00600000 0x0de00000 (bool20_reg12_reg16_o $ rsb)
-  -- {ARM_EXT_V1, 0x02600000, 0x0fe00000, "rsb%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00600000, 0x0fe00010, "rsb%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00600010, 0x0fe00090, "rsb%20's%c\t%12-15R, %16-19R, %o"},
-
-  , decoder [ARM_EXT_V1]    0x00800000 0x0de00000 (bool20_reg12_reg16_o $ add)
-  -- {ARM_EXT_V1, 0x02800000, 0x0fe00000, "add%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00800000, 0x0fe00010, "add%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00800010, 0x0fe00090, "add%20's%c\t%12-15R, %16-19R, %o"},
-
-  , decoder [ARM_EXT_V1]    0x00a00000 0x0de00000 (bool20_reg12_reg16_o $ adc)
-  -- {ARM_EXT_V1, 0x02a00000, 0x0fe00000, "adc%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00a00000, 0x0fe00010, "adc%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00a00010, 0x0fe00090, "adc%20's%c\t%12-15R, %16-19R, %o"},
-
-  , decoder [ARM_EXT_V1]    0x00c00000 0x0de00000 (bool20_reg12_reg16_o $ sbc)
-  -- {ARM_EXT_V1, 0x02c00000, 0x0fe00000, "sbc%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00c00000, 0x0fe00010, "sbc%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00c00010, 0x0fe00090, "sbc%20's%c\t%12-15R, %16-19R, %o"},
-
-  , decoder [ARM_EXT_V1]    0x00e00000 0x0de00000 (bool20_reg12_reg16_o $ rsc)
-  -- {ARM_EXT_V1, 0x02e00000, 0x0fe00000, "rsc%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00e00000, 0x0fe00010, "rsc%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x00e00010, 0x0fe00090, "rsc%20's%c\t%12-15R, %16-19R, %o"},
-
+  , decoder [ARM_EXT_V1]    0x052d0004 0x0fff0fff (PUSH <$> Regs <$> (pure <$> reg 12)) 
+                            
+  , decoder [ARM_EXT_V1]    0x04400000 0x0e500000 (str Byte <$> arm_t <*> reg 12 <*> arm_a) -- "strb%t%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1]    0x04000000 0x0e500000 (str Word <$> arm_t <*> reg 12 <*> arm_a) -- "str%t%c\t%12-15r, %a"},
+  , decoder [ARM_EXT_V1]    0x06400000 0x0e500ff0 (str Byte <$> arm_t <*> reg 12 <*> arm_a) -- "strb%t%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1]    0x06000000 0x0e500ff0 (str Word <$> arm_t <*> reg 12 <*> arm_a) -- "str%t%c\t%12-15r, %a"},
+  , decoder [ARM_EXT_V1]    0x04400000 0x0c500010 (str Byte <$> arm_t <*> reg 12 <*> arm_a) -- "strb%t%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1]    0x04000000 0x0c500010 (str Word <$> arm_t <*> reg 12 <*> arm_a) -- "str%t%c\t%12-15r, %a"},
+                            
+  , decoder [ARM_EXT_V1]    0x04400000 0x0e500000 (STRB <$> reg 12 <*> arm_a) -- "strb%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1]    0x06400000 0x0e500010 (STRB <$> reg 12 <*> arm_a) -- "strb%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1]    0x004000b0 0x0e5000f0 (STRH <$> reg 12 <*> arm_s) -- "strh%c\t%12-15R, %s"},
+  , decoder [ARM_EXT_V1]    0x000000b0 0x0e500ff0 (STRH <$> reg 12 <*> arm_s) -- "strh%c\t%12-15R, %s"},
+                            
+  , decoder [ARM_EXT_V1]    0x00500090 0x0e5000f0 (pure32 Undefined)
+  , decoder [ARM_EXT_V1]    0x00500090 0x0e500090 (ldr <$> arm_bh 5 <*> pure32 False <*> bool 6 <*> reg 12 <*> arm_s) -- "ldr%6's%5?hb%c\t%12-15R, %s"},
+  , decoder [ARM_EXT_V1]    0x00100090 0x0e500ff0 (pure32 Undefined)
+  , decoder [ARM_EXT_V1]    0x00100090 0x0e500f90 (ldr <$> arm_bh 5 <*> pure32 False <*> bool 6 <*> reg 12 <*> arm_s) -- "ldr%6's%5?hb%c\t%12-15R, %s"},
+                            
+  , decoder [ARM_EXT_V1]    0x02000000 0x0fe00000 (bool20_reg12_reg16_o $ and)  -- "and%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00000000 0x0fe00010 (bool20_reg12_reg16_o $ and)  -- "and%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00000010 0x0fe00090 (bool20_reg12_reg16_o $ and)  -- "and%20's%c\t%12-15R, %16-19R, %o"},
+                            
+  , decoder [ARM_EXT_V1]    0x02200000 0x0fe00000 (bool20_reg12_reg16_o $ eor)  -- "eor%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00200000 0x0fe00010 (bool20_reg12_reg16_o $ eor)  -- "eor%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00200010 0x0fe00090 (bool20_reg12_reg16_o $ eor)  -- "eor%20's%c\t%12-15R, %16-19R, %o"},
+                            
+  , decoder [ARM_EXT_V1]    0x02400000 0x0fe00000 (bool20_reg12_reg16_o $ sub)  -- "sub%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00400000 0x0fe00010 (bool20_reg12_reg16_o $ sub)  -- "sub%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00400010 0x0fe00090 (bool20_reg12_reg16_o $ sub)  -- "sub%20's%c\t%12-15R, %16-19R, %o"},
+                            
+  , decoder [ARM_EXT_V1]    0x02600000 0x0fe00000 (bool20_reg12_reg16_o $ rsb)  -- "rsb%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00600000 0x0fe00010 (bool20_reg12_reg16_o $ rsb)  -- "rsb%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00600010 0x0fe00090 (bool20_reg12_reg16_o $ rsb)  -- "rsb%20's%c\t%12-15R, %16-19R, %o"},
+                            
+  , decoder [ARM_EXT_V1]    0x02800000 0x0fe00000 (bool20_reg12_reg16_o $ add)  -- "add%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00800000 0x0fe00010 (bool20_reg12_reg16_o $ add)  -- "add%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00800010 0x0fe00090 (bool20_reg12_reg16_o $ add)  -- "add%20's%c\t%12-15R, %16-19R, %o"},
+                            
+  , decoder [ARM_EXT_V1]    0x02a00000 0x0fe00000 (bool20_reg12_reg16_o $ adc)  -- "adc%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00a00000 0x0fe00010 (bool20_reg12_reg16_o $ adc)  -- "adc%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00a00010 0x0fe00090 (bool20_reg12_reg16_o $ adc)  -- "adc%20's%c\t%12-15R, %16-19R, %o"},
+                            
+  , decoder [ARM_EXT_V1]    0x02c00000 0x0fe00000 (bool20_reg12_reg16_o $ sbc)  -- "sbc%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00c00000 0x0fe00010 (bool20_reg12_reg16_o $ sbc)  -- "sbc%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00c00010 0x0fe00090 (bool20_reg12_reg16_o $ sbc)  -- "sbc%20's%c\t%12-15R, %16-19R, %o"},
+                            
+  , decoder [ARM_EXT_V1]    0x02e00000 0x0fe00000 (bool20_reg12_reg16_o $ rsc)  -- "rsc%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00e00000 0x0fe00010 (bool20_reg12_reg16_o $ rsc)  -- "rsc%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x00e00010 0x0fe00090 (bool20_reg12_reg16_o $ rsc)  -- "rsc%20's%c\t%12-15R, %16-19R, %o"},
+                            
   , decoder [ARM_EXT_V3]    0x0120f000 0x0db0f000 (MSR <$> bool 18 <*> bool 19 <*> arm_o)
   , decoder [ARM_EXT_V3]    0x010f0000 0x0fbf0fff (MRS <$> reg 12 <*> choose 22 SPSR CPSR)
   
-  , decoder [ARM_EXT_V1]    0x01000000 0x0de00000 (TST <$> reg 16 <*> arm_o)
-  -- {ARM_EXT_V1, 0x03000000, 0x0fe00000, "tst%p%c\t%16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01000000, 0x0fe00010, "tst%p%c\t%16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01000010, 0x0fe00090, "tst%p%c\t%16-19R, %o"},
+  , decoder [ARM_EXT_V1]    0x03000000 0x0fe00000 (TST <$> reg 16 <*> arm_o) -- "tst%p%c\t%16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01000000 0x0fe00010 (TST <$> reg 16 <*> arm_o) -- "tst%p%c\t%16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01000010 0x0fe00090 (TST <$> reg 16 <*> arm_o) -- "tst%p%c\t%16-19R, %o"},
+
+  , decoder [ARM_EXT_V1]    0x03200000 0x0fe00000 (TEQ <$> reg 16 <*> arm_o) -- "teq%p%c\t%16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01200000 0x0fe00010 (TEQ <$> reg 16 <*> arm_o) -- "teq%p%c\t%16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01200010 0x0fe00090 (TEQ <$> reg 16 <*> arm_o) -- "teq%p%c\t%16-19R, %o"},
+
+  , decoder [ARM_EXT_V1]    0x03400000 0x0fe00000 (CMP <$> reg 16 <*> arm_o) -- "cmp%p%c\t%16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01400000 0x0ff00010 (MRS <$> reg 12 <*> choose 22 SPSR CPSR) -- "mrs%c\t%12-15R, %22?SCPSR"},
+  , decoder [ARM_EXT_V1]    0x01400000 0x0fe00010 (CMP <$> reg 16 <*> arm_o) -- "cmp%p%c\t%16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01400010 0x0fe00090 (CMP <$> reg 16 <*> arm_o) -- "cmp%p%c\t%16-19R, %o"},
   
-  , decoder [ARM_EXT_V1]    0x01200000 0x0de00000 (TEQ <$> reg 16 <*> arm_o)
-  -- {ARM_EXT_V1, 0x03200000, 0x0fe00000, "teq%p%c\t%16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01200000, 0x0fe00010, "teq%p%c\t%16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01200010, 0x0fe00090, "teq%p%c\t%16-19R, %o"},
-  
-  , decoder [ARM_EXT_V1]    0x01400000 0x0de00000 (CMP <$> reg 16 <*> arm_o) 
-  -- {ARM_EXT_V1, 0x03400000, 0x0fe00000, "cmp%p%c\t%16-19r, %o"},
-  -- {ARM_EXT_V3, 0x01400000, 0x0ff00010, "mrs%c\t%12-15R, %22?SCPSR"},
-  -- {ARM_EXT_V1, 0x01400000, 0x0fe00010, "cmp%p%c\t%16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01400010, 0x0fe00090, "cmp%p%c\t%16-19R, %o"},
-  
-  , decoder [ARM_EXT_V1]    0x01600000 0x0de00000 (CMN <$> reg 16 <*> arm_o)
-  -- {ARM_EXT_V1, 0x03600000, 0x0fe00000, "cmn%p%c\t%16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01600000, 0x0fe00010, "cmn%p%c\t%16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01600010, 0x0fe00090, "cmn%p%c\t%16-19R, %o"},
-  
-  , decoder [ARM_EXT_V1]    0x01800000 0x0de00000 (orr <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o)
-  -- {ARM_EXT_V1, 0x03800000, 0x0fe00000, "orr%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01800000, 0x0fe00010, "orr%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01800010, 0x0fe00090, "orr%20's%c\t%12-15R, %16-19R, %o"},
+  , decoder [ARM_EXT_V1]    0x03600000 0x0fe00000 (CMN <$> reg 16 <*> arm_o) -- "cmn%p%c\t%16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01600000 0x0fe00010 (CMN <$> reg 16 <*> arm_o) -- "cmn%p%c\t%16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01600010 0x0fe00090 (CMN <$> reg 16 <*> arm_o) -- "cmn%p%c\t%16-19R, %o"},
+
+  , decoder [ARM_EXT_V1]    0x03800000 0x0fe00000 (orr <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o) -- "orr%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01800000 0x0fe00010 (orr <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o) -- "orr%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01800010 0x0fe00090 (orr <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o) -- "orr%20's%c\t%12-15R, %16-19R, %o"},
 
   , decoder [ARM_EXT_V1]    0x03a00000 0x0fef0000 (mov <$> bool 20 <*> reg 12 <*> arm_o)
   , decoder [ARM_EXT_V1]    0x01a00000 0x0def0ff0 (mov <$> bool 20 <*> reg 12 <*> (Reg <$> reg 0))
@@ -505,25 +493,21 @@ armOpcodes =
   , decoder [ARM_EXT_V1]    0x01a00060 0x0def0ff0 (rrx <$> bool 20 <*> reg 12 <*> reg 0)
   , decoder [ARM_EXT_V1]    0x01a00060 0x0def0060 (ror <$> bool 20 <*> reg 12 <*> arm_q)
                                 
-  , decoder [ARM_EXT_V1]    0x01c00000 0x0de00000 (bic <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o)
-  -- {ARM_EXT_V1, 0x03c00000, 0x0fe00000, "bic%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01c00000, 0x0fe00010, "bic%20's%c\t%12-15r, %16-19r, %o"},
-  -- {ARM_EXT_V1, 0x01c00010, 0x0fe00090, "bic%20's%c\t%12-15R, %16-19R, %o"},
-  
-  , decoder [ARM_EXT_V1]    0x01e00000 0x0de00000 (mvn <$> bool 20 <*> reg 12 <*> arm_o)
-  -- {ARM_EXT_V1, 0x03e00000, 0x0fe00000, "mvn%20's%c\t%12-15r, %o"},
-  -- {ARM_EXT_V1, 0x01e00000, 0x0fe00010, "mvn%20's%c\t%12-15r, %o"},
-  -- {ARM_EXT_V1, 0x01e00010, 0x0fe00090, "mvn%20's%c\t%12-15R, %o"},
-  
+  , decoder [ARM_EXT_V1]    0x03c00000 0x0fe00000 (bic <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o) -- "bic%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01c00000 0x0fe00010 (bic <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o) -- "bic%20's%c\t%12-15r, %16-19r, %o"},
+  , decoder [ARM_EXT_V1]    0x01c00010 0x0fe00090 (bic <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o) -- "bic%20's%c\t%12-15R, %16-19R, %o"},
+
+  , decoder [ARM_EXT_V1]    0x03e00000 0x0fe00000 (mvn <$> bool 20 <*> reg 12 <*> arm_o) -- "mvn%20's%c\t%12-15r, %o"},
+  , decoder [ARM_EXT_V1]    0x01e00000 0x0fe00010 (mvn <$> bool 20 <*> reg 12 <*> arm_o) -- "mvn%20's%c\t%12-15r, %o"},
+  , decoder [ARM_EXT_V1]    0x01e00010 0x0fe00090 (mvn <$> bool 20 <*> reg 12 <*> arm_o) -- "mvn%20's%c\t%12-15R, %o"},
 
   , decoder [ARM_EXT_V1]    0x06000010 0x0e000010 (pure32 Undefined)
+
   
-  -- {ARM_EXT_V1, 0x049d0004, 0x0fff0fff, "pop%c\t{%12-15r}\t\t; (ldr%c %12-15r, %a)"},
-  -- 
-  -- {ARM_EXT_V1, 0x04500000, 0x0c500000, "ldrb%t%c\t%12-15R, %a"},
-  -- 
-  -- {ARM_EXT_V1, 0x04300000, 0x0d700000, "ldrt%c\t%12-15R, %a"},
-  -- {ARM_EXT_V1, 0x04100000, 0x0c500000, "ldr%c\t%12-15r, %a"},
+  , decoder [ARM_EXT_V1]    0x049d0004 0x0fff0fff (POP <$> (Regs . pure <$> reg 12)) -- "pop%c\t{%12-15r}\t\t; (ldr%c %12-15r, %a)"},
+  , decoder [ARM_EXT_V1]    0x04500000 0x0c500000 (ldr Byte <$> arm_t <*> pure False <*> reg 12 <*> arm_a) -- "ldrb%t%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1]    0x04300000 0x0d700000 (LDRT <$> reg 12 <*> arm_a) -- "ldrt%c\t%12-15R, %a"},
+  , decoder [ARM_EXT_V1]    0x04100000 0x0c500000 (LDR  <$> reg 12 <*> arm_a) -- "ldr%c\t%12-15r, %a"},
   
   
   , decoder [ARM_EXT_V1]    0x049d0004 0x0fff0fff (LDRH <$> reg 12 <*> arm_a)

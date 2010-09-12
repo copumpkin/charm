@@ -40,10 +40,6 @@ main =
      defaultMain [testGroup "Instructions from objdump" tests]
 
 {-
-  0x00000f98: 0x912d1fcf smlawtls sp, pc, pc, r1: [Failed]
-Failed: expected: "smlawtls sp, pc, pc, r1"
- but got: "teqls sp, pc, asr #31"
-
   0x00000e60: 0x731cf21e tstpvc ip, #-536870911: [Failed]
 Failed: expected: "tstpvc ip, #-536870911"
  but got: "tstvc ip, #-536870911"
@@ -52,14 +48,6 @@ Failed: expected: "tstpvc ip, #-536870911"
 Failed: expected: "strhvc sp, [r6], -r6"
  but got: "andvc sp, r6, r6, lsr ip"
 
-
-  0x00000954: 0xd0e9809f smlalle r8, r9, pc, r0: [Failed]
-Failed: expected: "smlalle r8, r9, pc, r0"
- but got: "rscle r8, r9, pc, lsl r0"
-
-  0x00000f54: 0x588c8018 stmpl ip, {r3, r4, pc}: [Failed]
-Failed: expected: "stmpl ip, {r3, r4, pc}"
- but got: "stmpl ip, {r3, r4, pc}^"
 
 
   0x00000d14: 0x91e77c96 strbls r7, [r7, #198]!: [Failed]
