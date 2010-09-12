@@ -53,7 +53,6 @@ flatten x = x
 armDecodeAddress :: D ARMOpMemory
 armDecodeAddress =
   do flag   <- bool 25
-     pcrel  <- (&& not flag) <$> allSet 16 19
      post   <- not <$> bool 24
      neg    <- not <$> bool 23
      offset <- integral 0 11
@@ -61,19 +60,13 @@ armDecodeAddress =
      let memReg = if neg then MemRegNeg else MemReg
          memRegPost = if neg then MemRegPostNeg else MemRegPost
          mem = if post then (const .) . memRegPost else memReg
-     if pcrel -- is this special case necessary?
-       then
-         if post
-           then
-             return $ MemRegPost PC (Imm offset) -- Is this right?
-           else
-             memReg PC (Imm offset) <$> bool 21
-       else
-         if flag
-           then
-             mem base <$> armDecodeShift <*> bool 21 
-           else
-             mem base (Imm offset) <$> bool 21
+     if base == PC && not flag -- is this special case necessary?
+       then if post
+              then return $ MemRegPost PC (Imm offset) -- Is this right? post on PC?
+              else memReg PC (Imm offset) <$> bool 21
+       else if flag
+              then mem base <$> armDecodeShift <*> bool 21 
+              else mem base (Imm offset) <$> bool 21
 
 
 armDecodeShift :: D ARMOpData
@@ -82,34 +75,37 @@ armDecodeShift i = let shift = toEnum $ integral 5 6 i in
                        if not (bool 4 i) then
                          let amount = integral 7 11 i in
                            if amount == 0 && shift == S_ROR
-                             then  
-                               RegShiftRRX (reg 0 i)
-                             else  
-                               RegShiftImm shift amount (reg 0 i)
-                         else
-                           RegShiftReg shift (reg 8 i) (reg 0 i)
-                       else 
-                         Reg (reg 0 i)
+                             then RegShiftRRX (reg 0 i)
+                             else RegShiftImm shift amount (reg 0 i)
+                         else RegShiftReg shift (reg 8 i) (reg 0 i)
+                       else Reg (reg 0 i)
 
 arm_a :: D ARMOpMemory
 arm_a = flatten . armDecodeAddress
 
--- FIXME: wow, this is pretty ugly...
+-- This is most probably wrong, still! but a lot cleaner than before :)
+arm_s' :: D ARMOpMemory
+arm_s' = 
+  do base   <- reg 16
+     neg    <- not <$> bool 23
+     offset <- liftM2 (.|.) ((`shiftL` 4) . integral 8 11) (integral 0 3)
+     post   <- not <$> bool 22
+     flag   <- bool 24
+     let memReg = if neg then MemRegNeg else MemReg
+         memRegPost = if neg then MemRegPostNeg else MemRegPost
+         mem = if post then (const .) . memRegPost else memReg
+     if not post && base == PC 
+       then return $ memReg PC (Imm $ offset) False
+       else if flag
+              then if post
+                then memReg <$> reg 16 <*> (Reg <$> reg 0) <*> bool 21
+                else memReg <$> reg 16 <*> pure (Imm offset) <*> bool 21
+              else if post
+                then memRegPost <$> reg 16 <*> (Reg <$> reg 0)
+                else memReg <$> reg 16 <*> pure (Imm offset) <*> pure False
+                
 arm_s :: D ARMOpMemory
-arm_s i | i .&. 0x4f0000 == 0x4f0000 = MemReg PC (Imm (fromIntegral $ (if i .&. 0x800000 == 0 then -1 else 1) * ((i .&. 0xf00) `shiftR` 4) .|. (i .&. 0xf))) False
-        | i .&. 0x1000000 /= 0 = case i .&. 0x400000 of
-            0x400000 -> MemReg (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) 
-                            (Imm $ let offset = ((i .&. 0xf00) `shiftR` 4) .|. (i .&. 0xf) in 
-                              if (i .&. 0x800000) == 0 then -(fromIntegral offset) else fromIntegral offset) 
-                               ((i .&. 0x200000) /= 0)
-            _        -> (if (i .&. 0x800000) == 0 then MemRegNeg else MemReg) (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf))
-                            (Reg $ toEnum ((fromIntegral i) .&. 0xf)) ((i .&. 0x200000) /= 0)
-        | otherwise = case i .&. 0x400000 of
-            0x400000 -> MemReg (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) 
-                            (Imm $ let offset = ((i .&. 0xf00) `shiftR` 4) .|. (i .&. 0xf) in 
-                              (if (i .&. 0x800000) == 0 then  -(fromIntegral offset) else fromIntegral offset))
-                               False
-            _        -> (if (i .&. 0x800000) == 0 then MemRegPostNeg else MemRegPost) (toEnum (((fromIntegral i) `shiftR` 16) .&. 0xf)) (Reg $ toEnum ((fromIntegral i) .&. 0xf))
+arm_s = flatten . arm_s'
 
 arm_b :: D Int32
 arm_b i = ((((fromIntegral i :: Int32) .&. 0xffffff) `xor` 0x800000) - 0x800000) * 4 + {-(fromIntegral $ pc s) + -} 8
