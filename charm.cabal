@@ -12,12 +12,16 @@ Build-type:          Simple
 -- Extra-source-files:  
 
 Library
+  Hs-source-dirs:      src/
+  
   -- Modules exported by the library.
   Exposed-modules:     Architecture.ARM, 
                        Architecture.ARM.Common, 
                        Architecture.ARM.Generate, 
                        Architecture.ARM.Pretty, 
+                       Architecture.ARM.State,
                        Architecture.ARM.Semantics, 
+                       Architecture.ARM.Decoder,
                        Architecture.ARM.Decoder.ARM, 
                        Architecture.ARM.Decoder.Thumb, 
                        Architecture.ARM.Instructions.UAL, 
@@ -28,7 +32,11 @@ Library
                        Architecture.ARM.Instructions.NEON.Semantics
   
   -- Packages needed in order to build this package.
-  -- Build-depends:       
+  Build-depends:       base       == 4.*,
+                       pretty     == 1.0.*,
+                       fclabels   == 0.9.*,
+                       containers == 0.3.*
+                       
   
   -- Modules not exported by this package.
   -- Other-modules:       
