@@ -315,7 +315,7 @@ data Conditional = B Int32
                  
                  | BFC ARMRegister (Maybe (Word32, Word32))
                  | BFI ARMRegister ARMRegister (Maybe (Word32, Word32)) -- come up with a nicer way to do this
-                 | MLS ARMRegister ARMRegister ARMRegister
+                 | MLS ARMRegister ARMRegister ARMRegister ARMRegister
                  
                  | MOVW ARMRegister Word32
                  | MOVT ARMRegister Word32

@@ -220,7 +220,7 @@ armOpcodes =
 
   , decoder [ARM_EXT_V6T2]  0x07c0001f 0x0fe0007f (BFC <$> reg 12 <*> arm_E)
   , decoder [ARM_EXT_V6T2]  0x07c00010 0x0fe00070 (BFI <$> reg 12 <*> reg 0 <*> arm_E)
-  , decoder [ARM_EXT_V6T2]  0x00600090 0x0ff000f0 (MLS <$> reg 0 <*> reg 8 <*> reg 12)
+  , decoder [ARM_EXT_V6T2]  0x00600090 0x0ff000f0 (MLS <$> reg 16 <*> reg 0 <*> reg 8 <*> reg 12)
   , decoder [ARM_EXT_V6T2]  0x006000b0 0x0f7000f0 (STRHT <$> reg 12 <*> arm_s) -- TODO: check me
 
 
