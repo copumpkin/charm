@@ -85,18 +85,16 @@ arm_a = flatten . armDecodeAddress
 
 arm_s' :: D ARMOpMemory
 arm_s' =
-  do base      <- reg 16
-     neg       <- not <$> bool 23
+  do neg       <- not <$> bool 23
      pre       <- bool 24
      imm       <- bool 22
-     writeBack <- bool 21
      offset    <- liftM2 (.|.) ((`shiftL` 4) . integral 8 11) (integral 0 3)
      
      -- Do I need special cases?
      let memRegPre = if neg then MemRegNeg else MemReg
          memRegPost = if neg then MemRegPostNeg else MemRegPost
          memReg = if pre then memRegPre else (const .) . memRegPost
-         final = memReg <$> pure base <*> (if imm then pure (Imm offset) else Reg <$> reg 0) <*> (pure writeBack)
+         final = memReg <$> reg 16 <*> (if imm then pure (Imm offset) else Reg <$> reg 0) <*> bool 21
      
      final
              
@@ -532,10 +530,10 @@ armOpcodes =
   , decoder [ARM_EXT_V1]    0x04100000 0x0c100000 (ldr <$> arm_bw 22 <*> arm_t <*> pure32 False <*> reg 12 <*> arm_a)
 
   , decoder [ARM_EXT_V1]    0x092d0000 0x0fff0000 (PUSH <$> (Regs <$> arm_m))
-  , decoder [ARM_EXT_V1]    0x08800000 0x0ff00000 (STM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m))
+  , decoder [ARM_EXT_V1]    0x08800000 0x0ff00000 (STM <$> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
   , decoder [ARM_EXT_V1]    0x08000000 0x0e100000 (stm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
   , decoder [ARM_EXT_V1]    0x08bd0000 0x0fff0000 (POP <$> (Regs <$> arm_m))
-  , decoder [ARM_EXT_V1]    0x08900000 0x0f900000 (LDM <$> bool 21 <*> reg 16 <*> (RegsCaret <$> arm_m))
+  , decoder [ARM_EXT_V1]    0x08900000 0x0f900000 (LDM <$> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
   , decoder [ARM_EXT_V1]    0x08100000 0x0e100000 (ldm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
   , decoder [ARM_EXT_V1]    0x0a000000 0x0e000000 (b <$> bool 24 <*> arm_b)
   , decoder [ARM_EXT_V1]    0x0f000000 0x0f000000 (SVC <$> integral 0 23)
