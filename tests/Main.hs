@@ -1,7 +1,9 @@
+{-# LANGUAGE GADTs #-}
 module Main where
 
 import Data.Word
 
+import Architecture.ARM.Common
 import Architecture.ARM.Instructions.UAL
 import Architecture.ARM.Decoder.ARM
 import Architecture.ARM.Pretty
@@ -20,16 +22,16 @@ import Data.Maybe
 
 import Text.Printf
 
-ualMatches :: Word32 -> UALInstruction -> String -> Assertion
-ualMatches off i@(Conditional _ _) s | "invalid" `isInfixOf` s || "undefined" `isInfixOf` s || null s = assertFailure (printf "invalid instruction '%s' decoded to '%s'" s (showInstruction i))
-ualMatches off i@(Unconditional _) s | "invalid" `isInfixOf` s || "undefined" `isInfixOf` s || null s = assertFailure (printf "invalid instruction '%s' decoded to '%s'" s (showInstruction i))
+ualMatches :: Word32 -> GeneralInstruction UAL -> String -> Assertion
+ualMatches off i@(Conditional _ _) s | "invalid" `isInfixOf` s || "undefined" `isInfixOf` s || null s = assertFailure (printf "invalid instruction '%s' decoded to '%s'" s (showGeneralInstruction i))
+ualMatches off i@(Unconditional _) s | "invalid" `isInfixOf` s || "undefined" `isInfixOf` s || null s = assertFailure (printf "invalid instruction '%s' decoded to '%s'" s (showGeneralInstruction i))
 ualMatches off Undefined s = assertBool "" True
 ualMatches off x ('s':'t':'m':'i':'a':r) = ualMatches off x $ 's':'t':'m':r
 ualMatches off x ('l':'d':'m':'i':'a':r) = ualMatches off x $ 'l':'d':'m':r
-ualMatches off (Conditional cond (B op)) s = map toLower (showInstruction (Conditional cond (B $ op + (fromIntegral off)))) @?= s
-ualMatches off (Conditional cond (BL op)) s = map toLower (showInstruction (Conditional cond (BL $ op + (fromIntegral off)))) @?= s
-ualMatches off (Unconditional (BLXUC op)) s = map toLower (showInstruction (Unconditional (BLXUC $ op + (fromIntegral off)))) @?= s
-ualMatches off x s = map toLower (showInstruction x) @?= s
+ualMatches off (Conditional cond (B op)) s = map toLower (showGeneralInstruction (Conditional cond (B $ op + (fromIntegral off)))) @?= s
+ualMatches off (Conditional cond (BL op)) s = map toLower (showGeneralInstruction (Conditional cond (BL $ op + (fromIntegral off)))) @?= s
+ualMatches off (Unconditional (BLXUC op)) s = map toLower (showGeneralInstruction (Unconditional (BLXUC $ op + (fromIntegral off)))) @?= s
+ualMatches off x s = map toLower (showGeneralInstruction x) @?= s
 
 main = 
   do rs <- fmap (take 1000 . randoms) getStdGen

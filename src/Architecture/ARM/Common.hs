@@ -89,9 +89,11 @@ data GeneralDecoder w i = GeneralDecoder { _subarchs :: [Subarch]
                                          , _decoder  :: w -> i
                                          }
 
-decoderMatches :: Bits (Word e) => Word e -> GeneralDecoder (Word e) i -> Bool
-decoderMatches x (GeneralDecoder _ v m _) = x .&. m == v 
+decoderMatches :: Bits (Word e) => e -> Word e -> GeneralDecoder (Word e) i -> Bool
+decoderMatches _ x (GeneralDecoder _ v m _) = x .&. m == v 
 
+decode :: e -> Word e -> GeneralDecoder (Word e) i -> i
+decode _ x (GeneralDecoder _ _ _ d) = d x
 
 
 class Decoder e i where

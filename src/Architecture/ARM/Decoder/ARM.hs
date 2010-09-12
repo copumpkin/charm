@@ -206,8 +206,7 @@ choose n t f x = if not (bool n x) then t else f
 bool20_reg12_reg16_o f = f <$> bool 20 <*> reg 12 <*> reg 16 <*> arm_o
 
 
--- armOpcodes :: [ARMDecoder Word32 Instruction UAL]
-armOpcodes = 
+armDecoders = 
   [ decoder ARM [ARM_EXT_V4T, ARM_EXT_V5] 0x012FFF10 0x0ffffff0 (BX <$> reg 0)
   , decoder ARM [ARM_EXT_V2]    0x00000090 0x0fe000f0 (mul <$> bool 20 <*> reg 16 <*> reg 0 <*> reg 8)
   , decoder ARM [ARM_EXT_V2]    0x00200090 0x0fe000f0 (mla <$> bool 20 <*> reg 16 <*> reg 0 <*> reg 8 <*> reg 12)
@@ -528,11 +527,10 @@ armOpcodes =
   , decoder ARM [ARM_EXT_V1]    0x00000000 0x00000000 (pure Undefined)
   ]
 
-{-
-armDecode :: Word32 -> Instruction UAL
-armDecode i = fromMaybe Undefined . fmap (armDecodeOp i) . find (armOpcodeMatches i) $ armOpcodes
 
-armDecodeDbg :: Word32 -> (Instruction UAL, Word32, Word32)
-armDecodeDbg i = case fromJust . find (armOpcodeMatches i) $ armOpcodes of
-                    ARMDecoder a b c d -> (armDecode i, b, c)
--}
+armDecode :: Word32 -> GeneralInstruction UAL
+armDecode i = fromMaybe Undefined . fmap (decode ARM i) . find (decoderMatches ARM i) $ armDecoders
+
+armDecodeDbg :: Word32 -> (GeneralInstruction UAL, (Word32, Word32))
+armDecodeDbg i = case fromJust . find (decoderMatches ARM i) $ armDecoders of
+                    GeneralDecoder a b c d -> (d i, (b, c))
