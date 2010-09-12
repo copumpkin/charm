@@ -121,16 +121,16 @@ arm_o i | i .&. 0x2000000 /= 0 = Imm . fromIntegral $ (i .&. 0xff) `rotateR` (((
         | otherwise = armDecodeShift i
 
 arm_p :: D Bool
-arm_p i = i .&. 0xf000 == 0xf000
+arm_p = allSet 12 15
 
 arm_t :: D Bool
-arm_t i = i .&. 0x1200000 == 0x200000
+arm_t = liftA2 (&&) (bool 21) (not <$> bool 24)
 
 arm_q :: D ARMOpData
 arm_q i = armDecodeShift i
 
 arm_e :: D Word32
-arm_e i = (i .&. 0xf) .|. ((i .&. 0xfff00) `shiftR` 4)
+arm_e = liftA2 (.|.) ((`shiftL` 4) <$> integral 8 19) (integral 0 3)
 
 arm_B :: D Int32
 arm_B = do x <- choose 23 0 0xff000000 -- negative bit
