@@ -1,11 +1,11 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, GADTs, EmptyDataDecls, FlexibleContexts #-}
 module Architecture.ARM.Common where
 
 import Data.Bits
-import Data.Word
+import Data.Word hiding (Word)
 import Data.Int
 
-data ARMArch = ARM_EXT_V1
+data Subarch = ARM_EXT_V1
              | ARM_EXT_V2
              | ARM_EXT_V2S
              | ARM_EXT_V3
@@ -31,21 +31,21 @@ data ARMArch = ARM_EXT_V1
              | FPU_VFP_EXT_V2
              | FPU_VFP_EXT_V3
 
-data ARMRegister = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 
-                 | R9 | R10 | R11 | R12 | SP | LR | PC
+data Register = R0 | R1 | R2 | R3 | R4 | R5 | R6 | R7 | R8 
+              | R9 | R10 | R11 | R12 | SP | LR | PC
   deriving (Show, Read, Eq, Ord, Enum)
 
-data ARMShift = S_LSL | S_LSR | S_ASR | S_ROR
+data Shift = S_LSL | S_LSR | S_ASR | S_ROR
   deriving (Show, Read, Eq, Enum)
 
 data Condition = EQ | NE | CS | CC | MI | PL | VS | VC
                | HI | LS | GE | LT | GT | LE | AL | UND
   deriving (Show, Read, Eq, Enum)
 
-data ARMStatusRegister = CPSR | SPSR
+data StatusRegister = CPSR | SPSR
   deriving (Show, Read, Eq, Ord, Enum)
 
-data ARMEndian = Big | Little
+data Endianness = Big | Little
   deriving (Show, Read, Eq, Enum)
 
 data Nybble = High | Low
@@ -54,29 +54,48 @@ data Nybble = High | Low
 data Width = Byte | Halfword | Word | Doubleword
   deriving (Show, Read, Eq, Enum)
 
-data ARMHint = SY | UN | ST | UNST | UK Word32 -- FIXME: should really prefix these consistently
+data Hint = SY | UN | ST | UNST | UK Word32 -- FIXME: should really prefix these consistently
   deriving (Show, Read, Eq)
 
-data ARMDirection = Decrement | Increment
+data Direction = Decrement | Increment
   deriving (Show, Read, Eq, Enum)
   
-data ARMOrder = Before | After
+data Order = Before | After
   deriving (Show, Read, Eq, Enum)
 
-data Mode = ARM | Thumb | Jazelle | ThumbEE
+-- data Mode = ARM | Thumb | Jazelle | ThumbEE
 
-class Decoder w a where
-  type Structure w a :: *
-  decoder :: [ARMArch] -> w -> w -> (w -> a) -> Structure w a
+
+data Conditional
+data Unconditional
+
+
+data GeneralInstruction a where
+  Conditional   :: Condition -> Instruction a Conditional -> GeneralInstruction a
+  Unconditional :: Instruction a Unconditional -> GeneralInstruction a
+  Undefined     :: GeneralInstruction a
+
+class InstructionSet a where
+  data Instruction a :: * -> *
+
+type family Word a :: *
+
+
+
+
+data GeneralDecoder w i = GeneralDecoder { _subarchs :: [Subarch]
+                                         , _value    :: w
+                                         , _mask     :: w
+                                         , _decoder  :: w -> i
+                                         }
+
+decoderMatches :: Bits (Word e) => Word e -> GeneralDecoder (Word e) i -> Bool
+decoderMatches x (GeneralDecoder _ v m _) = x .&. m == v 
+
+
+
+class Decoder e i where
+  type DecoderType e i :: *
   
-data ARMDecoder w a = ARMDecoder { decoder_arch     :: [ARMArch]
-                                 , decoder_value    :: w
-                                 , decoder_mask     :: w
-                                 , decoder_function :: w -> a
-                                 }
+  decoder :: e -> [Subarch] -> Word e -> Word e -> (Word e -> i) -> DecoderType e i
 
-armOpcodeMatches :: Bits w => w -> ARMDecoder w a -> Bool
-armOpcodeMatches x (ARMDecoder _ v m _) = x .&. m == v 
-
-armDecodeOp :: w -> ARMDecoder w a -> a
-armDecodeOp x (ARMDecoder _ _ _ d) = d x

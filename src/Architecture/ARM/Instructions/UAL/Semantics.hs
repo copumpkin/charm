@@ -20,6 +20,7 @@ data Expr a where
   (:&)   :: Expr a -> Expr a -> Expr a
   (:|)   :: Expr a -> Expr a -> Expr a
 
+{-
 -- Num should be an expression, and we should steal all the operators
 -- Need state monad
 evaluateConditional :: Num r => Conditional -> ARMState r m -> ARMState r m
@@ -31,3 +32,4 @@ evaluateConditional x = error $ "haven't implemented semantics for conditional i
 
 evaluate :: UALInstruction -> ARMState r m -> ARMState r m
 evaluate x = error $ "haven't implemented semantics for instruction " ++ show x
+-}

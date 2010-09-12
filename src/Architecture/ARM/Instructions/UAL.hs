@@ -1,3 +1,4 @@
+{-# LANGUAGE EmptyDataDecls, TypeFamilies, GADTs, StandaloneDeriving, FlexibleInstances #-}
 module Architecture.ARM.Instructions.UAL where
 
 import Prelude hiding (and)
@@ -5,352 +6,340 @@ import Prelude hiding (and)
 import Architecture.ARM.Common
 
 import Data.Int
-import Data.Word
+import Data.Word hiding (Word)
 
-{-
-data ARMOpRegister = Reg ARMRegister
-                   | RegBang ARMRegister
-  deriving (Show, Read, Eq)
--}
+data UAL = UAL
 
-data ARMOpData = Imm Int32
-               | Reg ARMRegister
-               | RegShiftImm ARMShift Int32 ARMRegister 
-               | RegShiftReg ARMShift ARMRegister ARMRegister
-               | RegShiftRRX ARMRegister
+data DataOp = Imm Int32
+            | Reg Register
+            | RegShiftImm Shift Int32 Register 
+            | RegShiftReg Shift Register Register
+            | RegShiftRRX Register
   deriving (Show, Read, Eq)
   
-data ARMOpMemory = MemReg ARMRegister ARMOpData Bool
-                 | MemRegNeg ARMRegister ARMOpData Bool
-                 | MemRegPost ARMRegister ARMOpData
-                 | MemRegPostNeg ARMRegister ARMOpData
+data MemOp = MemReg Register DataOp Bool
+           | MemRegNeg Register DataOp Bool
+           | MemRegPost Register DataOp
+           | MemRegPostNeg Register DataOp
   deriving (Show, Read, Eq)
 
-data ARMOpMultiple = Regs [ARMRegister]
-                   | RegsCaret [ARMRegister]
+data MultiRegOp = Regs [Register]
+                | RegsCaret [Register]
   deriving (Show, Read, Eq)
 
-data UALInstruction = Unconditional Unconditional
-                    | Conditional Condition Conditional
-                    | Undefined
-  deriving (Show, Read, Eq)
 
--- Todo: use a GADT here and index constructors by whether they're conditional or not?
-data Conditional = B Int32
-                 | BL Int32
-                 | BLX ARMRegister -- conditional form
-                 | BX ARMRegister
-                 | BXJ ARMRegister
+instance InstructionSet UAL where
+  data Instruction UAL c where
+    -- Explicit branches
+    B   :: Int32    -> Instruction UAL Conditional
+    BL  :: Int32    -> Instruction UAL Conditional
+    BX  :: Register -> Instruction UAL Conditional
+    BLX :: Register -> Instruction UAL Conditional
+    BXJ :: Register -> Instruction UAL Conditional
+    
+    AND  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    ANDS :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    EOR  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    EORS :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    SUB  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    SUBS :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    RSB  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    RSBS :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    ADD  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    ADDS :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    ADC  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    ADCS :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    SBC  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    SBCS :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    RSC  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    RSCS :: Register -> Register -> DataOp -> Instruction UAL Conditional
                  
-                 | AND  ARMRegister ARMRegister ARMOpData
-                 | ANDS ARMRegister ARMRegister ARMOpData
-                                                         
-                 | EOR  ARMRegister ARMRegister ARMOpData
-                 | EORS ARMRegister ARMRegister ARMOpData
-                                                         
-                 | SUB  ARMRegister ARMRegister ARMOpData
-                 | SUBS ARMRegister ARMRegister ARMOpData
-                                                         
-                 | RSB  ARMRegister ARMRegister ARMOpData
-                 | RSBS ARMRegister ARMRegister ARMOpData
-                                                         
-                 | ADD  ARMRegister ARMRegister ARMOpData
-                 | ADDS ARMRegister ARMRegister ARMOpData
-                                                         
-                 | ADC  ARMRegister ARMRegister ARMOpData
-                 | ADCS ARMRegister ARMRegister ARMOpData
-                                                         
-                 | SBC  ARMRegister ARMRegister ARMOpData
-                 | SBCS ARMRegister ARMRegister ARMOpData
-                                                         
-                 | RSC  ARMRegister ARMRegister ARMOpData
-                 | RSCS ARMRegister ARMRegister ARMOpData
-                                                         
-                 | TST ARMRegister ARMOpData
-                 | TEQ ARMRegister ARMOpData
-                 | CMP ARMRegister ARMOpData
-                 | CMN ARMRegister ARMOpData
-                 
-                 | ORR  ARMRegister ARMRegister ARMOpData
-                 | ORRS ARMRegister ARMRegister ARMOpData
-                 
-                 | MOV  ARMRegister ARMOpData
-                 | MOVS ARMRegister ARMOpData
-                 
-                 | LSL  ARMRegister ARMOpData
-                 | LSLS ARMRegister ARMOpData
-                 
-                 | LSR  ARMRegister ARMOpData
-                 | LSRS ARMRegister ARMOpData
-                 
-                 | ASR  ARMRegister ARMOpData
-                 | ASRS ARMRegister ARMOpData
-                 
-                 | RRX  ARMRegister ARMRegister 
-                 | RRXS ARMRegister ARMRegister
-                 
-                 | ROR  ARMRegister ARMOpData
-                 | RORS ARMRegister ARMOpData
-                 
-                 | BIC  ARMRegister ARMRegister ARMOpData
-                 | BICS ARMRegister ARMRegister ARMOpData
-                 
-                 | MVN  ARMRegister ARMOpData
-                 | MVNS ARMRegister ARMOpData
-                                           
-                 | MLA  ARMRegister ARMRegister ARMRegister ARMRegister
-                 | MLAS ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | MUL  ARMRegister ARMRegister ARMRegister 
-                 | MULS ARMRegister ARMRegister ARMRegister 
-                 
-                 
-                 | SMLABB ARMRegister ARMRegister ARMRegister ARMRegister 
-                 | SMLABT ARMRegister ARMRegister ARMRegister ARMRegister 
-                 | SMLATB ARMRegister ARMRegister ARMRegister ARMRegister 
-                 | SMLATT ARMRegister ARMRegister ARMRegister ARMRegister 
-                                                                          
-                 | SMLAWB ARMRegister ARMRegister ARMRegister ARMRegister 
-                 | SMLAWT ARMRegister ARMRegister ARMRegister ARMRegister 
-                 
-                 | SMLAD  ARMRegister ARMRegister ARMRegister ARMRegister
-                 | SMLADX ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | SMLAL  ARMRegister ARMRegister ARMRegister ARMRegister -- FIXME: are first two ArmRegisters more complicated?
-                 | SMLALS ARMRegister ARMRegister ARMRegister ARMRegister -- FIXME: are first two ArmRegisters more complicated?
-                 
-                 | SMLALBB ARMRegister ARMRegister ARMRegister ARMRegister
-                 | SMLALBT ARMRegister ARMRegister ARMRegister ARMRegister
-                 | SMLALTB ARMRegister ARMRegister ARMRegister ARMRegister
-                 | SMLALTT ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | SMLALD  ARMRegister ARMRegister ARMRegister ARMRegister
-                 | SMLALDX ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | SMLSD  ARMRegister ARMRegister ARMRegister ARMRegister
-                 | SMLSDX ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | SMLSLD  ARMRegister ARMRegister ARMRegister ARMRegister
-                 | SMLSLDX ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | SMMLA  ARMRegister ARMRegister ARMRegister ARMRegister
-                 | SMMLAR ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | SMMUL  ARMRegister ARMRegister ARMRegister 
-                 | SMMULR ARMRegister ARMRegister ARMRegister 
-                 
-                 | SMMLS  ARMRegister ARMRegister ARMRegister ARMRegister
-                 | SMMLSR ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | SMUAD  ARMRegister ARMRegister ARMRegister
-                 | SMUADX ARMRegister ARMRegister ARMRegister
-                 
-                 | SMULBB ARMRegister ARMRegister ARMRegister
-                 | SMULBT ARMRegister ARMRegister ARMRegister
-                 | SMULTB ARMRegister ARMRegister ARMRegister
-                 | SMULTT ARMRegister ARMRegister ARMRegister
-                 
-                 | SMULL  ARMRegister ARMRegister ARMRegister ARMRegister
-                 | SMULLS ARMRegister ARMRegister ARMRegister ARMRegister                          
-                                  
-                 | SMULWB ARMRegister ARMRegister ARMRegister
-                 | SMULWT ARMRegister ARMRegister ARMRegister
-                 
-                 | SMUSD  ARMRegister ARMRegister ARMRegister
-                 | SMUSDX ARMRegister ARMRegister ARMRegister
-                 
-                 | UMAAL ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | UMLAL  ARMRegister ARMRegister ARMRegister ARMRegister
-                 | UMLALS ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | UMULL  ARMRegister ARMRegister ARMRegister ARMRegister
-                 | UMULLS ARMRegister ARMRegister ARMRegister ARMRegister
-                                           
-                 | QADD ARMRegister ARMRegister ARMRegister
-                 | QADD16 ARMRegister ARMRegister ARMRegister
-                 | QADD8 ARMRegister ARMRegister ARMRegister
-                 | QASX ARMRegister ARMRegister ARMRegister
-                 | QDADD ARMRegister ARMRegister ARMRegister
-                 | QDSUB ARMRegister ARMRegister ARMRegister
-                 | QSUB ARMRegister ARMRegister ARMRegister
-                 | QSUB16 ARMRegister ARMRegister ARMRegister
-                 | QSUB8 ARMRegister ARMRegister ARMRegister
-                 | QSAX ARMRegister ARMRegister ARMRegister
-                 
-                 | SADD16 ARMRegister ARMRegister ARMRegister
-                 | SADD8 ARMRegister ARMRegister ARMRegister
-                 | SASX ARMRegister ARMRegister ARMRegister
-                 | SSUB16 ARMRegister ARMRegister ARMRegister
-                 | SSUB8 ARMRegister ARMRegister ARMRegister
-                 | SSAX ARMRegister ARMRegister ARMRegister
-                 
-                 | SHADD16 ARMRegister ARMRegister ARMRegister
-                 | SHADD8 ARMRegister ARMRegister ARMRegister
-                 | SHASX ARMRegister ARMRegister ARMRegister
-                 | SHSUB16 ARMRegister ARMRegister ARMRegister
-                 | SHSUB8 ARMRegister ARMRegister ARMRegister
-                 | SHSAX ARMRegister ARMRegister ARMRegister
-                 
-                 | UADD16 ARMRegister ARMRegister ARMRegister
-                 | UADD8 ARMRegister ARMRegister ARMRegister
-                 | UASX ARMRegister ARMRegister ARMRegister
-                 | USUB16 ARMRegister ARMRegister ARMRegister
-                 | USUB8 ARMRegister ARMRegister ARMRegister
-                 | USAX ARMRegister ARMRegister ARMRegister
-                 
-                 | UHADD16 ARMRegister ARMRegister ARMRegister
-                 | UHADD8 ARMRegister ARMRegister ARMRegister
-                 | UHASX ARMRegister ARMRegister ARMRegister
-                 | UHSUB16 ARMRegister ARMRegister ARMRegister
-                 | UHSUB8 ARMRegister ARMRegister ARMRegister
-                 | UHSAX ARMRegister ARMRegister ARMRegister
-                 
-                 | UQADD16 ARMRegister ARMRegister ARMRegister
-                 | UQADD8 ARMRegister ARMRegister ARMRegister
-                 | UQASX ARMRegister ARMRegister ARMRegister
-                 | UQSUB16 ARMRegister ARMRegister ARMRegister
-                 | UQSUB8 ARMRegister ARMRegister ARMRegister
-                 | UQSAX ARMRegister ARMRegister ARMRegister
-                 
-                 | SXTAB16 ARMRegister ARMRegister ARMOpData -- rotate
-                 | SXTAB ARMRegister ARMRegister ARMOpData -- rotate
-                 | SXTAH ARMRegister ARMRegister ARMOpData -- rotate
-                 | SXTB16 ARMRegister ARMOpData -- rotate
-                 | SXTB ARMRegister ARMOpData --rotate only -- NEW
-                 | SXTH ARMRegister ARMOpData --rotate only -- NEW
-                 | UXTAB16 ARMRegister ARMRegister ARMOpData -- rotate 
-                 | UXTAB ARMRegister ARMRegister ARMOpData -- rotate
-                 | UXTAH ARMRegister ARMRegister ARMOpData -- rotate
-                 | UXTB16 ARMRegister ARMOpData -- rotate
-                 | UXTB ARMRegister ARMOpData -- rotate -- NEW
-                 | UXTH ARMRegister ARMOpData -- rotate -- NEW
-                 
-                 | UBFX ARMRegister ARMRegister Word32 Word32
-                 | SBFX ARMRegister ARMRegister Word32 Word32
-                 
-                 | CLZ ARMRegister ARMRegister
-                 | USAD8 ARMRegister ARMRegister ARMRegister 
-                 | USADA8 ARMRegister ARMRegister ARMRegister ARMRegister
-                 | PKHBT ARMRegister ARMRegister ARMOpData -- rotate/shift
-                 | PKHTB ARMRegister ARMRegister ARMOpData -- rotate/shift
-                 | REV ARMRegister ARMRegister
-                 | REV16 ARMRegister ARMRegister
-                 | REVSH ARMRegister ARMRegister
-                 | SEL ARMRegister ARMRegister ARMRegister
-                 | SSAT ARMRegister Word8 ARMOpData -- rotate/shift
-                 | SSAT16 ARMRegister Word8 ARMRegister
-                 | USAT ARMRegister Word8 ARMOpData -- rotate/shift
-                 | USAT16 ARMRegister Word8 ARMRegister
-                 
-                 | MRS ARMRegister ARMStatusRegister
-                 | MSR Bool Bool ARMOpData -- FIXME: always immediate, we should fix this. make the o parser's internals reusable
-                 
-                 | LDR  ARMRegister ARMOpMemory 
-                 | LDRB ARMRegister ARMOpMemory 
-                 | LDRH ARMRegister ARMOpMemory 
-                 | LDRD ARMRegister ARMOpMemory 
-                 
-                 | LDRBT ARMRegister ARMOpMemory
-                 | LDRHT ARMRegister ARMOpMemory
-                 | LDRT  ARMRegister ARMOpMemory
-                 
-                 | LDRSB  ARMRegister ARMOpMemory
-                 | LDRSBT ARMRegister ARMOpMemory
-                 
-                 | LDRSH  ARMRegister ARMOpMemory 
-                 | LDRSHT ARMRegister ARMOpMemory 
-                 
-                 | STR  ARMRegister ARMOpMemory
-                 | STRB ARMRegister ARMOpMemory
-                 | STRH ARMRegister ARMOpMemory
-                 | STRD ARMRegister ARMOpMemory
-                 
-                 | STRBT ARMRegister ARMOpMemory
-                 | STRHT ARMRegister ARMOpMemory
-                 | STRT ARMRegister ARMOpMemory
-                 
-                 
-                 
-                 | LDREX  ARMRegister ARMOpMemory
-                 | LDREXB ARMRegister ARMOpMemory
-                 | LDREXH ARMRegister ARMOpMemory
-                 | LDREXD ARMRegister ARMRegister ARMOpMemory
-                 
-                 | STREX  ARMRegister ARMRegister ARMOpMemory
-                 | STREXB ARMRegister ARMRegister ARMOpMemory
-                 | STREXH ARMRegister ARMRegister ARMOpMemory
-                 | STREXD ARMRegister ARMRegister ARMRegister ARMOpMemory
-                                           
-                 | LDM   Bool ARMRegister ARMOpMultiple -- == LDMIA /LDMFD
-                 | LDMDA Bool ARMRegister ARMOpMultiple -- == LDMFA
-                 | LDMDB Bool ARMRegister ARMOpMultiple -- == LDMEA
-                 | LDMIB Bool ARMRegister ARMOpMultiple -- == LDMED
-                 
-                 | STM   Bool ARMRegister ARMOpMultiple -- == STMIA / STMFD
-                 | STMDA Bool ARMRegister ARMOpMultiple -- == STMFA
-                 | STMDB Bool ARMRegister ARMOpMultiple -- == STMEA
-                 | STMIB Bool ARMRegister ARMOpMultiple -- == STMED
-                 
-                 | PUSH ARMOpMultiple
-                 | POP ARMOpMultiple
-                 
-                 | SWP ARMRegister ARMRegister ARMOpMemory -- Last reg is actually a memory offset
-                 | SWPB ARMRegister ARMRegister ARMOpMemory -- Last reg is actually a memory offset
-                 
-                 | SMC Word32
-                 | SVC Word32
-                 
-                 | DBG Word32
-                 | DMB ARMHint
-                 | DSB ARMHint
-                 | ISB ARMHint
-                 
-                 | PLI ARMOpMemory
-                 
-                 | YIELD
-                 | WFE
-                 | WFI
-                 | SEV
-                 
-                 | BFC ARMRegister (Maybe (Word32, Word32))
-                 | BFI ARMRegister ARMRegister (Maybe (Word32, Word32)) -- come up with a nicer way to do this
-                 | MLS ARMRegister ARMRegister ARMRegister ARMRegister
-                 
-                 | MOVW ARMRegister Word32
-                 | MOVT ARMRegister Word32
-                 | RBIT ARMRegister ARMRegister
-                 
-                 | NOP 
-  deriving (Show, Read, Eq)
+    TST  :: Register -> DataOp -> Instruction UAL Conditional
+    TEQ  :: Register -> DataOp -> Instruction UAL Conditional
+    CMP  :: Register -> DataOp -> Instruction UAL Conditional
+    CMN  :: Register -> DataOp -> Instruction UAL Conditional
 
-data Unconditional = CPS Word32
-                   | CPSIE Bool Bool Bool (Maybe Word32)
-                   | CPSID Bool Bool Bool (Maybe Word32)
-                   | SETEND ARMEndian
-                   
-                   | RFE   Bool ARMRegister
-                   | RFEDA Bool ARMRegister
-                   | RFEDB Bool ARMRegister
-                   | RFEIB Bool ARMRegister
-                   
-                   | BKPT Word8
-                   | PLD ARMOpMemory
-                   
-                   | SRS   Bool ARMRegister Word32 -- the register is always SP/R13
-                   | SRSDA Bool ARMRegister Word32 -- the register is always SP/R13
-                   | SRSDB Bool ARMRegister Word32 -- the register is always SP/R13
-                   | SRSIB Bool ARMRegister Word32 -- the register is always SP/R13
-                   
-                   | CLREX
-                   | BLXUC Int32 -- unconditional BLX
-  deriving (Show, Read, Eq)
+    ORR  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    ORRS :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    
+    MOV  :: Register -> DataOp -> Instruction UAL Conditional
+    MOVS :: Register -> DataOp -> Instruction UAL Conditional
+    LSL  :: Register -> DataOp -> Instruction UAL Conditional
+    LSLS :: Register -> DataOp -> Instruction UAL Conditional
+    LSR  :: Register -> DataOp -> Instruction UAL Conditional
+    LSRS :: Register -> DataOp -> Instruction UAL Conditional
+    ASR  :: Register -> DataOp -> Instruction UAL Conditional
+    ASRS :: Register -> DataOp -> Instruction UAL Conditional
+    
+    RRX  :: Register -> Register -> Instruction UAL Conditional 
+    RRXS :: Register -> Register -> Instruction UAL Conditional
+    
+    ROR  :: Register -> DataOp -> Instruction UAL Conditional
+    RORS :: Register -> DataOp -> Instruction UAL Conditional
+    
+    BIC  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    BICS :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    
+    MVN  :: Register -> DataOp -> Instruction UAL Conditional
+    MVNS :: Register -> DataOp -> Instruction UAL Conditional
+    
+    MLA  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    MLAS :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    
+    MUL  :: Register -> Register -> Register -> Instruction UAL Conditional 
+    MULS :: Register -> Register -> Register -> Instruction UAL Conditional 
+    
+    SMLABB  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLABT  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLATB  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLATT  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+                                                            
+    SMLAWB  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLAWT  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+            
+    SMLAD   :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLADX  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+            
+    SMLAL   :: Register -> Register -> Register -> Register -> Instruction UAL Conditional-- FIXME: are first two Registers more complicated?
+    SMLALS  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional-- FIXME: are first two Registers more complicated?
+    
+    SMLALBB :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLALBT :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLALTB :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLALTT :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    
+    SMLALD  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLALDX :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    
+    SMLSD   :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLSDX  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    
+    SMLSLD  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMLSLDX :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    
+    SMMLA   :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMMLAR  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+            
+    SMMUL   :: Register -> Register -> Register -> Instruction UAL Conditional 
+    SMMULR  :: Register -> Register -> Register -> Instruction UAL Conditional 
+            
+    SMMLS   :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMMLSR  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+            
+    SMUAD   :: Register -> Register -> Register -> Instruction UAL Conditional
+    SMUADX  :: Register -> Register -> Register -> Instruction UAL Conditional
+            
+    SMULBB  :: Register -> Register -> Register -> Instruction UAL Conditional
+    SMULBT  :: Register -> Register -> Register -> Instruction UAL Conditional
+    SMULTB  :: Register -> Register -> Register -> Instruction UAL Conditional
+    SMULTT  :: Register -> Register -> Register -> Instruction UAL Conditional
+            
+    SMULL   :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    SMULLS  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional                         
+                    
+    SMULWB  :: Register -> Register -> Register -> Instruction UAL Conditional
+    SMULWT  :: Register -> Register -> Register -> Instruction UAL Conditional
+            
+    SMUSD   :: Register -> Register -> Register -> Instruction UAL Conditional
+    SMUSDX  :: Register -> Register -> Register -> Instruction UAL Conditional
+            
+    UMAAL   :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+            
+    UMLAL   :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    UMLALS  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+            
+    UMULL   :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    UMULLS  :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    
+    QADD    :: Register -> Register -> Register -> Instruction UAL Conditional
+    QADD16  :: Register -> Register -> Register -> Instruction UAL Conditional
+    QADD8   :: Register -> Register -> Register -> Instruction UAL Conditional
+    QASX    :: Register -> Register -> Register -> Instruction UAL Conditional
+    QDADD   :: Register -> Register -> Register -> Instruction UAL Conditional
+    QDSUB   :: Register -> Register -> Register -> Instruction UAL Conditional
+    QSUB    :: Register -> Register -> Register -> Instruction UAL Conditional
+    QSUB16  :: Register -> Register -> Register -> Instruction UAL Conditional
+    QSUB8   :: Register -> Register -> Register -> Instruction UAL Conditional
+    QSAX    :: Register -> Register -> Register -> Instruction UAL Conditional
+
+    SADD16  :: Register -> Register -> Register -> Instruction UAL Conditional
+    SADD8   :: Register -> Register -> Register -> Instruction UAL Conditional
+    SASX    :: Register -> Register -> Register -> Instruction UAL Conditional
+    SSUB16  :: Register -> Register -> Register -> Instruction UAL Conditional
+    SSUB8   :: Register -> Register -> Register -> Instruction UAL Conditional
+    SSAX    :: Register -> Register -> Register -> Instruction UAL Conditional
+
+    SHADD16 :: Register -> Register -> Register -> Instruction UAL Conditional
+    SHADD8  :: Register -> Register -> Register -> Instruction UAL Conditional
+    SHASX   :: Register -> Register -> Register -> Instruction UAL Conditional
+    SHSUB16 :: Register -> Register -> Register -> Instruction UAL Conditional
+    SHSUB8  :: Register -> Register -> Register -> Instruction UAL Conditional
+    SHSAX   :: Register -> Register -> Register -> Instruction UAL Conditional
+
+    UADD16  :: Register -> Register -> Register -> Instruction UAL Conditional
+    UADD8   :: Register -> Register -> Register -> Instruction UAL Conditional
+    UASX    :: Register -> Register -> Register -> Instruction UAL Conditional
+    USUB16  :: Register -> Register -> Register -> Instruction UAL Conditional
+    USUB8   :: Register -> Register -> Register -> Instruction UAL Conditional
+    USAX    :: Register -> Register -> Register -> Instruction UAL Conditional
+
+    UHADD16 :: Register -> Register -> Register -> Instruction UAL Conditional
+    UHADD8  :: Register -> Register -> Register -> Instruction UAL Conditional
+    UHASX   :: Register -> Register -> Register -> Instruction UAL Conditional
+    UHSUB16 :: Register -> Register -> Register -> Instruction UAL Conditional
+    UHSUB8  :: Register -> Register -> Register -> Instruction UAL Conditional
+    UHSAX   :: Register -> Register -> Register -> Instruction UAL Conditional
+
+    UQADD16 :: Register -> Register -> Register -> Instruction UAL Conditional
+    UQADD8  :: Register -> Register -> Register -> Instruction UAL Conditional
+    UQASX   :: Register -> Register -> Register -> Instruction UAL Conditional
+    UQSUB16 :: Register -> Register -> Register -> Instruction UAL Conditional
+    UQSUB8  :: Register -> Register -> Register -> Instruction UAL Conditional
+    UQSAX   :: Register -> Register -> Register -> Instruction UAL Conditional
+
+    SXTAB16 :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    SXTAB   :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    SXTAH   :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    SXTB16  :: Register -> DataOp -> Instruction UAL Conditional
+    SXTB    :: Register -> DataOp -> Instruction UAL Conditional
+    SXTH    :: Register -> DataOp -> Instruction UAL Conditional
+    UXTAB16 :: Register -> Register -> DataOp -> Instruction UAL Conditional 
+    UXTAB   :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    UXTAH   :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    UXTB16  :: Register -> DataOp -> Instruction UAL Conditional
+    UXTB    :: Register -> DataOp -> Instruction UAL Conditional
+    UXTH    :: Register -> DataOp -> Instruction UAL Conditional
+
+                 
+    UBFX :: Register -> Register -> Word32 -> Word32 -> Instruction UAL Conditional
+    SBFX :: Register -> Register -> Word32 -> Word32 -> Instruction UAL Conditional
+    
+    CLZ    :: Register -> Register -> Instruction UAL Conditional
+
+    USAD8  :: Register -> Register -> Register -> Instruction UAL Conditional 
+    USADA8 :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+
+    PKHBT  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+    PKHTB  :: Register -> Register -> DataOp -> Instruction UAL Conditional
+
+    REV    :: Register -> Register -> Instruction UAL Conditional
+    REV16  :: Register -> Register -> Instruction UAL Conditional
+    REVSH  :: Register -> Register -> Instruction UAL Conditional
+
+    SEL    :: Register -> Register -> Register -> Instruction UAL Conditional
+
+    SSAT   :: Register -> Word8 -> DataOp -> Instruction UAL Conditional
+    SSAT16 :: Register -> Word8 -> Register -> Instruction UAL Conditional
+    USAT   :: Register -> Word8 -> DataOp -> Instruction UAL Conditional
+    USAT16 :: Register -> Word8 -> Register -> Instruction UAL Conditional
+
+    MRS :: Register -> StatusRegister -> Instruction UAL Conditional
+    MSR :: Bool -> Bool -> DataOp -> Instruction UAL Conditional -- FIXME: always immediate, we should fix this. make the o parser's internals reusable
+
+    LDR    :: Register -> MemOp -> Instruction UAL Conditional
+    LDRB   :: Register -> MemOp -> Instruction UAL Conditional
+    LDRH   :: Register -> MemOp -> Instruction UAL Conditional
+    LDRD   :: Register -> MemOp -> Instruction UAL Conditional
+    LDRBT  :: Register -> MemOp -> Instruction UAL Conditional
+    LDRHT  :: Register -> MemOp -> Instruction UAL Conditional
+    LDRT   :: Register -> MemOp -> Instruction UAL Conditional
+    LDRSB  :: Register -> MemOp -> Instruction UAL Conditional
+    LDRSBT :: Register -> MemOp -> Instruction UAL Conditional
+    LDRSH  :: Register -> MemOp -> Instruction UAL Conditional
+    LDRSHT :: Register -> MemOp -> Instruction UAL Conditional
+    
+    STR    :: Register -> MemOp -> Instruction UAL Conditional
+    STRB   :: Register -> MemOp -> Instruction UAL Conditional
+    STRH   :: Register -> MemOp -> Instruction UAL Conditional
+    STRD   :: Register -> MemOp -> Instruction UAL Conditional
+    STRBT  :: Register -> MemOp -> Instruction UAL Conditional
+    STRHT  :: Register -> MemOp -> Instruction UAL Conditional
+    STRT   :: Register -> MemOp -> Instruction UAL Conditional
+    
+    
+    
+    LDREX  :: Register -> MemOp -> Instruction UAL Conditional
+    LDREXB :: Register -> MemOp -> Instruction UAL Conditional
+    LDREXH :: Register -> MemOp -> Instruction UAL Conditional
+    LDREXD :: Register -> Register -> MemOp -> Instruction UAL Conditional
+
+    STREX  :: Register -> Register -> MemOp -> Instruction UAL Conditional
+    STREXB :: Register -> Register -> MemOp -> Instruction UAL Conditional
+    STREXH :: Register -> Register -> MemOp -> Instruction UAL Conditional
+    STREXD :: Register -> Register -> Register -> MemOp -> Instruction UAL Conditional 
+                            
+    LDM    :: Bool -> Register -> MultiRegOp -> Instruction UAL Conditional -- == LDMIA /LDMFD
+    LDMDA  :: Bool -> Register -> MultiRegOp -> Instruction UAL Conditional -- == LDMFA
+    LDMDB  :: Bool -> Register -> MultiRegOp -> Instruction UAL Conditional -- == LDMEA
+    LDMIB  :: Bool -> Register -> MultiRegOp -> Instruction UAL Conditional -- == LDMED
+                                                
+    STM    :: Bool -> Register -> MultiRegOp -> Instruction UAL Conditional -- == STMIA / STMFD
+    STMDA  :: Bool -> Register -> MultiRegOp -> Instruction UAL Conditional -- == STMFA
+    STMDB  :: Bool -> Register -> MultiRegOp -> Instruction UAL Conditional -- == STMEA
+    STMIB  :: Bool -> Register -> MultiRegOp -> Instruction UAL Conditional -- == STMED
+
+    PUSH :: MultiRegOp -> Instruction UAL Conditional
+    POP  :: MultiRegOp -> Instruction UAL Conditional
+
+    SWP  :: Register -> Register -> MemOp -> Instruction UAL Conditional -- Last reg is actually a memory offset
+    SWPB :: Register -> Register -> MemOp -> Instruction UAL Conditional -- Last reg is actually a memory offset
+
+    SMC :: Word32 -> Instruction UAL Conditional
+    SVC :: Word32 -> Instruction UAL Conditional
+
+    DBG :: Word32 -> Instruction UAL Conditional
+    DMB :: Hint -> Instruction UAL Conditional
+    DSB :: Hint -> Instruction UAL Conditional
+    ISB :: Hint -> Instruction UAL Conditional
+    
+    PLI :: MemOp -> Instruction UAL Conditional
+    
+    YIELD :: Instruction UAL Conditional
+    WFE :: Instruction UAL Conditional
+    WFI :: Instruction UAL Conditional
+    SEV :: Instruction UAL Conditional
+    
+    BFC :: Register -> Maybe (Word32, Word32) -> Instruction UAL Conditional
+    BFI :: Register -> Register -> Maybe (Word32, Word32) -> Instruction UAL Conditional -- come up with a nicer way to do this
+    MLS :: Register -> Register -> Register -> Register -> Instruction UAL Conditional
+    
+    MOVW :: Register -> Word32 -> Instruction UAL Conditional
+    MOVT :: Register -> Word32 -> Instruction UAL Conditional
+    RBIT :: Register -> Register -> Instruction UAL Conditional
+    
+    NOP :: Instruction UAL Conditional
+
+    CPS    :: Word32 -> Instruction UAL Unconditional
+    CPSIE  :: Bool -> Bool -> Bool -> Maybe Word32 -> Instruction UAL Unconditional
+    CPSID  :: Bool -> Bool -> Bool -> Maybe Word32 -> Instruction UAL Unconditional
+    SETEND :: Endianness -> Instruction UAL Unconditional
+
+    RFE    :: Bool -> Register -> Instruction UAL Unconditional
+    RFEDA  :: Bool -> Register -> Instruction UAL Unconditional
+    RFEDB  :: Bool -> Register -> Instruction UAL Unconditional
+    RFEIB  :: Bool -> Register -> Instruction UAL Unconditional
+
+    BKPT   :: Word8 -> Instruction UAL Unconditional
+    PLD    :: MemOp -> Instruction UAL Unconditional
+
+    SRS    :: Bool -> Register -> Word32 -> Instruction UAL Unconditional -- the register is always SP/R13
+    SRSDA  :: Bool -> Register -> Word32 -> Instruction UAL Unconditional -- the register is always SP/R13
+    SRSDB  :: Bool -> Register -> Word32 -> Instruction UAL Unconditional -- the register is always SP/R13
+    SRSIB  :: Bool -> Register -> Word32 -> Instruction UAL Unconditional -- the register is always SP/R13
+    
+    CLREX  :: Instruction UAL Unconditional
+    BLXUC  :: Int32 -> Instruction UAL Unconditional -- unconditional BLX
+
+deriving instance Show (Instruction UAL c)
+
+
 
 cond :: a -> a -> Bool -> a
 cond f t False = f
 cond f t True  = t
 
 
+-- Convenience pseudo-constructors. I should probably just factor out the common behavior into the constructors, really.
 
 and = cond AND ANDS
 eor = cond EOR EORS
@@ -392,7 +381,7 @@ umull = cond UMULL UMULLS
 smlal = cond SMLAL SMLALS
 smull = cond SMULL SMULLS
 
-ldr :: Width -> Bool -> Bool -> ARMRegister -> ARMOpMemory -> Conditional
+ldr :: Width -> Bool -> Bool -> Register -> MemOp -> Instruction UAL Conditional
 ldr Byte       False  False = LDRB 
 ldr Byte       False  True  = LDRSB 
 ldr Byte       True   False = LDRBT
@@ -406,7 +395,7 @@ ldr Word       True   False = LDRT
 ldr Doubleword False  False = LDRD
 ldr _ _ _ = error "invalid combination of LDR flags"
 
-str :: Width -> Bool -> ARMRegister -> ARMOpMemory -> Conditional
+str :: Width -> Bool -> Register -> MemOp -> Instruction UAL Conditional
 str Byte       False  = STRB 
 str Byte       True   = STRBT
 str Halfword   False  = STRH
@@ -440,12 +429,3 @@ swp = cond SWP SWPB
 
 
 b = cond B BL
-
-isBranch :: UALInstruction -> Bool
-isBranch (Conditional _ (B _)) = True
-isBranch (Conditional _ (BL _)) = True
-isBranch (Conditional _ (BLX _)) = True
-isBranch (Conditional _ (BX _)) = True
-isBranch (Conditional _ (BXJ _)) = True
--- A bunch more
-isBranch _ = False

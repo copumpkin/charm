@@ -17,15 +17,15 @@ import Control.Category
 import Architecture.ARM.Common
 
 
-data ARMState r m = ARMState { _regs       :: Map ARMRegister r -- An EnumMap?
-                             , _memory     :: IntMap m -- A trie or interval-tree-based memory map, when I get around to writing one
-                             , _statusRegs :: Map ARMStatusRegister r
-                             }
+data State r m = State { _regs       :: Map Register r -- An EnumMap?
+                       , _memory     :: IntMap m -- A trie or interval-tree-based memory map, when I get around to writing one
+                       , _statusRegs :: Map StatusRegister r
+                       }
 
-getReg :: ARMRegister -> ARMState r m -> r
+getReg :: Register -> State r m -> r
 getReg r s = _regs s Map.! r
 
-setReg :: ARMRegister -> r -> ARMState r m -> ARMState r m
+setReg :: Register -> r -> State r m -> State r m
 setReg r x s = s { _regs = Map.insert r x (_regs s) }
 
 reg r = lens (getReg r) (setReg r)
@@ -47,10 +47,10 @@ sp  = reg SP
 lr  = reg LR
 pc  = reg PC
 
-getMem :: Word32 -> ARMState r m -> m
+getMem :: Word32 -> State r m -> m
 getMem p s = _memory s IntMap.! fromIntegral p
 
-setMem :: Word32 -> m -> ARMState r m -> ARMState r m
+setMem :: Word32 -> m -> State r m -> State r m
 setMem p x s = s { _memory = IntMap.insert (fromIntegral p) x (_memory s) }
 
 memory p = lens (getMem p) (setMem p)
