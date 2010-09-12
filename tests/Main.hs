@@ -42,10 +42,6 @@ main =
 Failed: expected: "smlawtls sp, pc, pc, r1"
  but got: "teqls sp, pc, asr #31"
 
-   0x00000f64: 0xc0f054f4 ldrshtgt r5, [r0], #68: [Failed]
- Failed: expected: "ldrshtgt r5, [r0], #68"
-  but got: "ldrhgt r5, [r0, #68]"
-
   0x00000e60: 0x731cf21e tstpvc ip, #-536870911: [Failed]
 Failed: expected: "tstpvc ip, #-536870911"
  but got: "tstvc ip, #-536870911"
@@ -54,13 +50,6 @@ Failed: expected: "tstpvc ip, #-536870911"
 Failed: expected: "strhvc sp, [r6], -r6"
  but got: "andvc sp, r6, r6, lsr ip"
 
-  0x00000c80: 0x307c1fd2 ldrsbtcc r1, [ip], #-242: [Failed]
-Failed: expected: "ldrsbtcc r1, [ip], #-242"
- but got: "ldrsbcc r1, [ip, #-242]"
-
-  0x00000ba0: 0x61dc5afb ldrshvs r5, [ip, #171]: [Failed]
-Failed: expected: "ldrshvs r5, [ip, #171]"
- but got: "ldrhvs r5, [ip, #171]"
 
   0x00000954: 0xd0e9809f smlalle r8, r9, pc, r0: [Failed]
 Failed: expected: "smlalle r8, r9, pc, r0"

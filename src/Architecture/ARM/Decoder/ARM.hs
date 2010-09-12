@@ -83,35 +83,32 @@ armDecodeShift i = let shift = toEnum $ integral 5 6 i in
 arm_a :: D ARMOpMemory
 arm_a = flatten . armDecodeAddress
 
--- This is most probably wrong, still! but a lot cleaner than before :)
 arm_s' :: D ARMOpMemory
-arm_s' = 
-  do base   <- reg 16
-     neg    <- not <$> bool 23
-     offset <- liftM2 (.|.) ((`shiftL` 4) . integral 8 11) (integral 0 3)
-     post   <- not <$> bool 22
-     flag   <- bool 24
-     let memReg = if neg then MemRegNeg else MemReg
+arm_s' =
+  do base      <- reg 16
+     neg       <- not <$> bool 23
+     pre       <- bool 24
+     imm       <- bool 22
+     writeBack <- bool 21
+     offset    <- liftM2 (.|.) ((`shiftL` 4) . integral 8 11) (integral 0 3)
+     
+     -- Do I need special cases?
+     let memRegPre = if neg then MemRegNeg else MemReg
          memRegPost = if neg then MemRegPostNeg else MemRegPost
-         mem = if post then (const .) . memRegPost else memReg
-     if not post && base == PC 
-       then return $ memReg PC (Imm $ offset) False
-       else if flag
-              then if post
-                then memReg <$> reg 16 <*> (Reg <$> reg 0) <*> bool 21
-                else memReg <$> reg 16 <*> pure (Imm offset) <*> bool 21
-              else if post
-                then memRegPost <$> reg 16 <*> (Reg <$> reg 0)
-                else memReg <$> reg 16 <*> pure (Imm offset) <*> pure False
-                
+         memReg = if pre then memRegPre else (const .) . memRegPost
+         final = memReg <$> pure base <*> (if imm then pure (Imm offset) else Reg <$> reg 0) <*> (pure writeBack)
+     
+     final
+             
 arm_s :: D ARMOpMemory
 arm_s = flatten . arm_s'
 
+-- this needs a sign extend function
 arm_b :: D Int32
 arm_b i = ((((fromIntegral i :: Int32) .&. 0xffffff) `xor` 0x800000) - 0x800000) * 4 + {-(fromIntegral $ pc s) + -} 8
 
 arm_c :: D Condition
-arm_c i = toEnum $ fromIntegral ((i `shiftR` 28) .&. 0xf)
+arm_c = toEnum . integral 28 31
 
 arm_m :: D [ARMRegister]
 arm_m i = [toEnum b | b <- [0..15], bool b i]
