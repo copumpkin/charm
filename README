@@ -1,6 +1,1 @@
-PREALPHA! there's mostly only a decoder in here, and a skeleton of what's to come.
-Plans are to make it compatible with ARM's UAL (universal assembly language) but
-there's woefully little information out there on it. And of course a good testsuite
-would be very helpful.
-
 The structure of the decoders is based off arm-dis.c from binutils.
