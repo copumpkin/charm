@@ -59,4 +59,17 @@ Failed: expected: "smlalle r8, r9, pc, r0"
 Failed: expected: "stmpl ip, {r3, r4, pc}"
  but got: "stmpl ip, {r3, r4, pc}^"
 
+
+  0x00000d14: 0x91e77c96 strbls r7, [r7, #198]!: [Failed]
+Failed: expected: "strbls r7, [r7, #198]!"
+ but got: "mvnls r7, r6, lsl ip"
+
+  0x00000f88: 0x504f19b5 strhpl r1, [pc, #-149]: [Failed]
+Failed: expected: "strhpl r1, [pc, #-149]"
+ but got: "strhpl r1, [pc], #-149"
+ 
+   0x00000f74: 0xe0ff0bdc ldrsbt r0, [pc, #188]: [Failed]
+ Failed: expected: "ldrsbt r0, [pc, #188]"
+  but got: "ldrsbt r0, [pc], #188"
+
 -}

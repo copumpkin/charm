@@ -76,7 +76,7 @@ armDecodeShift i = let shift = toEnum $ integral 5 6 i in
                          let amount = integral 7 11 i in
                            if amount == 0 && shift == S_ROR
                              then RegShiftRRX (reg 0 i)
-                             else RegShiftImm shift amount (reg 0 i)
+                             else RegShiftImm shift (if amount == 0 then 32 else amount) (reg 0 i)
                          else RegShiftReg shift (reg 8 i) (reg 0 i)
                        else Reg (reg 0 i)
 
@@ -105,7 +105,7 @@ arm_s = flatten . arm_s'
 
 -- this needs a sign extend function
 arm_b :: D Int32
-arm_b i = ((((fromIntegral i :: Int32) .&. 0xffffff) `xor` 0x800000) - 0x800000) * 4 + {-(fromIntegral $ pc s) + -} 8
+arm_b i = ((((fromIntegral i :: Int32) .&. 0xffffff) `xor` 0x800000) - 0x800000) * 4 {- FIXME: not here -} + 8
 
 arm_c :: D Condition
 arm_c = toEnum . integral 28 31
@@ -114,7 +114,7 @@ arm_m :: D [ARMRegister]
 arm_m i = [toEnum b | b <- [0..15], bool b i]
 
 arm_o :: D ARMOpData
-arm_o i | i .&. 0x2000000 /= 0 = Imm . fromIntegral $ (i .&. 0xff) `rotateR` (((fromIntegral i) .&. 0xf00) `shiftR` 7)
+arm_o i | bool 25 i = Imm $ integral 0 7 i `rotateR` (2 * integral 8 11 i)
         | otherwise = armDecodeShift i
 
 arm_p :: D Bool
@@ -134,9 +134,8 @@ arm_B = do x <- choose 23 0 0xff000000 -- negative bit
            y <- integral 0 23
            let offset = (x + y :: Int32) `shiftL` 2
            z <- choose 24 0 2 -- 2
-           return (fromIntegral (offset + 8 + z)) -- FIXME: Do I want that +8 in there? Or should I deal with it later
-            
-         
+           return (fromIntegral (offset + 8 + z)) -- FIXME: Do I want that +8 in there? Or should I deal with it later. Probably later, but will leave it in for now.
+
 -- FIXME: this is ugly
 arm_C :: D String
 arm_C i = '_' : (if i .&. 0x80000 /= 0 then "f" else "" ++ 
@@ -156,17 +155,13 @@ arm_P :: D ARMOpMemory
 arm_P i = armDecodeAddress $ i .|. (1 `shiftL` 24)
 
 reg :: Int -> D ARMRegister
-reg start i = toEnum (bitRange start (start + 3)i)
+reg start i = toEnum (bitRange start (start + 3) i)
 
 integral :: (Integral a, Bits a) => Int -> Int -> D a
 integral start end i = bitRange start end i
 
 integral' :: (Integral a, Bits a) => Int -> Int -> D a
 integral' start end i = (+1) . bitRange start end $ i
-
-arm_X :: Int -> Int -> D Word32
-arm_X start end i = (.&. 0xf) . bitRange start end $ i
-
 
 arm_E :: D (Maybe (Word32, Word32))
 arm_E i = let msb = (i .&. 0x1f0000) `shiftR` 16
@@ -177,7 +172,7 @@ arm_E i = let msb = (i .&. 0x1f0000) `shiftR` 16
               else Nothing --"(invalid " ++ (show lsb) ++ ":" ++ (show msb) ++ ")"            
 
 arm_V :: D Word32
-arm_V i = (i .&. 0xf0000) `shiftR` 4 .|. (i .&. 0xfff)
+arm_V = liftM2 (.|.) ((`shiftL` 12) <$> integral 16 19) (integral 0 11)
 
 bit b i = bitRange b b i
 
@@ -237,7 +232,7 @@ armOpcodes =
   , decoder [ARM_EXT_V6T2]  0x03000000 0x0ff00000 (MOVW <$> reg 12 <*> arm_V)
   , decoder [ARM_EXT_V6T2]  0x03400000 0x0ff00000 (MOVT <$> reg 12 <*> arm_V)
   , decoder [ARM_EXT_V6T2]  0x06ff0f30 0x0fff0ff0 (RBIT <$> reg 12 <*> reg 0)
-  , decoder [ARM_EXT_V6T2]  0x07a00050 0x0fa00070 (choose 22 UBFX SBFX <*> reg 12 <*> reg 0 <*> integral 7 11 <*> integral' 16 20)
+  , decoder [ARM_EXT_V6T2]  0x07a00050 0x0fa00070 (choose 22 SBFX UBFX <*> reg 12 <*> reg 0 <*> integral 7 11 <*> integral' 16 20)
 
   , decoder [ARM_EXT_V6Z]   0x01600070 0x0ff000f0 (SMC <$> arm_e)
 
@@ -427,8 +422,8 @@ armOpcodes =
   
   , decoder [ARM_EXT_V1] 0x04400000 0x0e500000 (STRB <$> reg 12 <*> arm_a) -- "strb%c\t%12-15R, %a"},
   , decoder [ARM_EXT_V1] 0x06400000 0x0e500010 (STRB <$> reg 12 <*> arm_a) -- "strb%c\t%12-15R, %a"},
-  , decoder [ARM_EXT_V1] 0x004000b0 0x0e5000f0 (STRH <$> reg 12 <*> arm_a) -- "strh%c\t%12-15R, %s"},
-  , decoder [ARM_EXT_V1] 0x000000b0 0x0e500ff0 (STRH <$> reg 12 <*> arm_a) -- "strh%c\t%12-15R, %s"},
+  , decoder [ARM_EXT_V1] 0x004000b0 0x0e5000f0 (STRH <$> reg 12 <*> arm_s) -- "strh%c\t%12-15R, %s"},
+  , decoder [ARM_EXT_V1] 0x000000b0 0x0e500ff0 (STRH <$> reg 12 <*> arm_s) -- "strh%c\t%12-15R, %s"},
   
   , decoder [ARM_EXT_V1] 0x00500090 0x0e5000f0 (pure32 Undefined)
   , decoder [ARM_EXT_V1] 0x00500090 0x0e500090 (ldr <$> arm_bh 5 <*> pure32 False <*> bool 6 <*> reg 12 <*> arm_s) -- "ldr%6's%5?hb%c\t%12-15R, %s"},
