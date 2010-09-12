@@ -114,7 +114,7 @@ arm_c :: D Condition
 arm_c i = toEnum $ fromIntegral ((i `shiftR` 28) .&. 0xf)
 
 arm_m :: D [ARMRegister]
-arm_m i = catMaybes $ map (\x -> if i .&. (1 `shiftL` x) /= 0 then Just $ toEnum x else Nothing) [0..15]
+arm_m i = [toEnum b | b <- [0..15], bool b i]
 
 arm_o :: D ARMOpData
 arm_o i | i .&. 0x2000000 /= 0 = Imm . fromIntegral $ (i .&. 0xff) `rotateR` (((fromIntegral i) .&. 0xf00) `shiftR` 7)
@@ -235,7 +235,7 @@ armOpcodes =
 
 
   , decoder [ARM_EXT_V6T2]  0x00300090 0x0f3000f0 (pure32 Undefined :: Word32 -> UALInstruction)
-  , decoder [ARM_EXT_V6T2]  0x00300090 0x0f300090 (ldr <$> arm_bh 5 <*> pure False <*> bool 6 <*> reg 12 <*> arm_s)
+  , decoder [ARM_EXT_V6T2]  0x00300090 0x0f300090 (ldr <$> arm_bh 5 <*> pure True <*> bool 6 <*> reg 12 <*> arm_s)
 
   , decoder [ARM_EXT_V6T2]  0x03000000 0x0ff00000 (MOVW <$> reg 12 <*> arm_V)
   , decoder [ARM_EXT_V6T2]  0x03400000 0x0ff00000 (MOVT <$> reg 12 <*> arm_V)

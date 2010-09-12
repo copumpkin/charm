@@ -255,9 +255,11 @@ data Conditional = B Int32
                  | LDRHT ARMRegister ARMOpMemory
                  | LDRT  ARMRegister ARMOpMemory
                  
-                 | LDRSB ARMRegister ARMOpMemory
-                 | LDRSH ARMRegister ARMOpMemory 
+                 | LDRSB  ARMRegister ARMOpMemory
+                 | LDRSBT ARMRegister ARMOpMemory
                  
+                 | LDRSH  ARMRegister ARMOpMemory 
+                 | LDRSHT ARMRegister ARMOpMemory 
                  
                  | STR  ARMRegister ARMOpMemory
                  | STRB ARMRegister ARMOpMemory
@@ -394,9 +396,11 @@ ldr :: Width -> Bool -> Bool -> ARMRegister -> ARMOpMemory -> Conditional
 ldr Byte       False  False = LDRB 
 ldr Byte       False  True  = LDRSB 
 ldr Byte       True   False = LDRBT
+ldr Byte       True   True  = LDRSBT
 ldr Halfword   False  False = LDRH
 ldr Halfword   False  True  = LDRH
 ldr Halfword   True   False = LDRHT
+ldr Halfword   True   True  = LDRSHT
 ldr Word       False  False = LDR
 ldr Word       True   False = LDRT
 ldr Doubleword False  False = LDRD
