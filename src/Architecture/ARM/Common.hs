@@ -12,6 +12,7 @@ data Subarch = ARM_EXT_V1
              | ARM_EXT_V3M
              | ARM_EXT_V4T 
              | ARM_EXT_V5
+             | ARM_EXT_V5T
              | ARM_EXT_V5E
              | ARM_EXT_V5ExP
              | ARM_EXT_V5J

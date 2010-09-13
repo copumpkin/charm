@@ -30,7 +30,6 @@ data MultiRegOp = Regs [Register]
 
 instance InstructionSet UAL where
   data Instruction UAL c where
-    -- Explicit branches
     B   :: Int32    -> Instruction UAL Conditional
     BL  :: Int32    -> Instruction UAL Conditional
     BX  :: Register -> Instruction UAL Conditional
@@ -329,6 +328,11 @@ instance InstructionSet UAL where
     
     CLREX  :: Instruction UAL Unconditional
     BLXUC  :: Int32 -> Instruction UAL Unconditional -- unconditional BLX
+
+    CBNZ   :: Register -> Word32 -> Instruction UAL Unconditional
+    CBZ    :: Register -> Word32 -> Instruction UAL Unconditional
+
+    IT     :: () -> Instruction UAL Unconditional -- FIXME
 
 deriving instance Show (Instruction UAL c)
 
