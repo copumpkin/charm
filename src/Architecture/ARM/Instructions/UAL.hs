@@ -331,11 +331,16 @@ instance InstructionSet UAL where
     CBNZ   :: Register -> Word32 -> Instruction UAL Unconditional
     CBZ    :: Register -> Word32 -> Instruction UAL Unconditional
 
-    IT     :: () -> Instruction UAL Unconditional -- FIXME
+    IT     :: ITSpecifier -> Instruction UAL Unconditional
 
 deriving instance Show (Instruction UAL c)
 
+-- Handy psuedo-accessors to use the flexible blx
+blxc :: DataOp -> Instruction UAL Conditional
+blxc = BLX
 
+blxu :: DataOp -> Instruction UAL Unconditional
+blxu = BLX
 
 cond :: a -> a -> Bool -> a
 cond f t False = f

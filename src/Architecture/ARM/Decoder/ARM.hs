@@ -300,7 +300,7 @@ armDecoders =
   , decoder ARM [ARM_EXT_V6]    0x06bf0f30 0x0fff0ff0 (REV     <$> reg 12 <*> reg 0)
   , decoder ARM [ARM_EXT_V6]    0x06bf0fb0 0x0fff0ff0 (REV16   <$> reg 12 <*> reg 0)
   , decoder ARM [ARM_EXT_V6]    0x06ff0fb0 0x0fff0ff0 (REVSH   <$> reg 12 <*> reg 0)
-  , decoder ARM [ARM_EXT_V6]    0xf8100a00 0xfe50ffff (rfe <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16)
+  , decoder ARM [ARM_EXT_V6]    0xf8100a00 0xfe50ffff (rfe     <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16)
   , decoder ARM [ARM_EXT_V6]    0x06bf0070 0x0fff0ff0 (SXTH    <$> reg 12 <*>            (Reg <$> reg 0))
   , decoder ARM [ARM_EXT_V6]    0x06bf0470 0x0fff0ff0 (SXTH    <$> reg 12 <*>            (RegShiftImm S_ROR 8 <$> reg 0))
   , decoder ARM [ARM_EXT_V6]    0x06bf0870 0x0fff0ff0 (SXTH    <$> reg 12 <*>            (RegShiftImm S_ROR 16 <$> reg 0))
@@ -374,12 +374,12 @@ armDecoders =
   , decoder ARM [ARM_EXT_V6]    0x06e00050 0x0fe00070 (USAT   <$> reg 12 <*> integral 16 20 <*> (RegShiftImm S_ASR <$> integral 7 11 <*> reg 0))
   , decoder ARM [ARM_EXT_V6]    0x06e00f30 0x0ff00ff0 (USAT16 <$> reg 12 <*> integral 16 19 <*> reg 0)
  
-  , decoder ARM [ARM_EXT_V5J]   0x012fff20 0x0ffffff0 (BXJ <$> reg 0)
+  , decoder ARM [ARM_EXT_V5J]   0x012fff20 0x0ffffff0 (BXJ  <$> reg 0)
  
   , decoder ARM [ARM_EXT_V5]    0xe1200070 0xfff000f0 (BKPT <$> ((\x y -> x `shiftL` 4 .|. y) <$> integral 8 19 <*> integral 0 3)) 
-  , decoder ARM [ARM_EXT_V5]    0xfa000000 0xfe000000 ((BLX :: DataOp -> Instruction UAL Unconditional) <$> (Imm <$> arm_B))
-  , decoder ARM [ARM_EXT_V5]    0x012fff30 0x0ffffff0 ((BLX :: DataOp -> Instruction UAL Conditional)   <$> (Reg <$> reg 0))
-  , decoder ARM [ARM_EXT_V5]    0x016f0f10 0x0fff0ff0 (CLZ <$> reg 12 <*> reg 0)
+  , decoder ARM [ARM_EXT_V5]    0xfa000000 0xfe000000 (blxu <$> (Imm <$> arm_B))
+  , decoder ARM [ARM_EXT_V5]    0x012fff30 0x0ffffff0 (blxc <$> (Reg <$> reg 0))
+  , decoder ARM [ARM_EXT_V5]    0x016f0f10 0x0fff0ff0 (CLZ  <$> reg 12 <*> reg 0)
   
   , decoder ARM [ARM_EXT_V5E]   0x000000d0 0x0e1000f0 (LDRD <$> reg 12 <*> arm_s)
   , decoder ARM [ARM_EXT_V5E]   0x000000f0 0x0e1000f0 (STRD <$> reg 12 <*> arm_s)
@@ -506,23 +506,23 @@ armDecoders =
   , decoder ARM [ARM_EXT_V1]    0x06000010 0x0e000010 (pure Undefined)
 
   
-  , decoder ARM [ARM_EXT_V1]    0x049d0004 0x0fff0fff (POP <$> (Regs . pure <$> reg 12)) -- "pop%c\t{%12-15r}\t\t; (ldr%c %12-15r, %a)"},
+  , decoder ARM [ARM_EXT_V1]    0x049d0004 0x0fff0fff (POP      <$> (Regs . pure <$> reg 12)) -- "pop%c\t{%12-15r}\t\t; (ldr%c %12-15r, %a)"},
   , decoder ARM [ARM_EXT_V1]    0x04500000 0x0c500000 (ldr Byte <$> arm_t <*> pure False <*> reg 12 <*> arm_a) -- "ldrb%t%c\t%12-15R, %a"},
-  , decoder ARM [ARM_EXT_V1]    0x04300000 0x0d700000 (LDRT <$> reg 12 <*> arm_a) -- "ldrt%c\t%12-15R, %a"},
-  , decoder ARM [ARM_EXT_V1]    0x04100000 0x0c500000 (LDR  <$> reg 12 <*> arm_a) -- "ldr%c\t%12-15r, %a"},
+  , decoder ARM [ARM_EXT_V1]    0x04300000 0x0d700000 (LDRT     <$> reg 12 <*> arm_a) -- "ldrt%c\t%12-15R, %a"},
+  , decoder ARM [ARM_EXT_V1]    0x04100000 0x0c500000 (LDR      <$> reg 12 <*> arm_a) -- "ldr%c\t%12-15r, %a"},
   
   
   , decoder ARM [ARM_EXT_V1]    0x049d0004 0x0fff0fff (LDRH <$> reg 12 <*> arm_a)
-  , decoder ARM [ARM_EXT_V1]    0x04100000 0x0c100000 (ldr <$> arm_bw 22 <*> arm_t <*> pure False <*> reg 12 <*> arm_a)
+  , decoder ARM [ARM_EXT_V1]    0x04100000 0x0c100000 (ldr  <$> arm_bw 22 <*> arm_t <*> pure False <*> reg 12 <*> arm_a)
 
   , decoder ARM [ARM_EXT_V1]    0x092d0000 0x0fff0000 (PUSH <$> (Regs <$> arm_m))
-  , decoder ARM [ARM_EXT_V1]    0x08800000 0x0ff00000 (STM <$> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
-  , decoder ARM [ARM_EXT_V1]    0x08000000 0x0e100000 (stm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
-  , decoder ARM [ARM_EXT_V1]    0x08bd0000 0x0fff0000 (POP <$> (Regs <$> arm_m))
-  , decoder ARM [ARM_EXT_V1]    0x08900000 0x0f900000 (LDM <$> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
-  , decoder ARM [ARM_EXT_V1]    0x08100000 0x0e100000 (ldm <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
-  , decoder ARM [ARM_EXT_V1]    0x0a000000 0x0e000000 (b <$> bool 24 <*> arm_b)
-  , decoder ARM [ARM_EXT_V1]    0x0f000000 0x0f000000 (SVC <$> integral 0 23)
+  , decoder ARM [ARM_EXT_V1]    0x08800000 0x0ff00000 (STM  <$> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
+  , decoder ARM [ARM_EXT_V1]    0x08000000 0x0e100000 (stm  <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
+  , decoder ARM [ARM_EXT_V1]    0x08bd0000 0x0fff0000 (POP  <$> (Regs <$> arm_m))
+  , decoder ARM [ARM_EXT_V1]    0x08900000 0x0f900000 (LDM  <$> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
+  , decoder ARM [ARM_EXT_V1]    0x08100000 0x0e100000 (ldm  <$> direction 23 <*> order 24 <*> bool 21 <*> reg 16 <*> (choose 22 Regs RegsCaret <*> arm_m))
+  , decoder ARM [ARM_EXT_V1]    0x0a000000 0x0e000000 (b    <$> bool 24 <*> arm_b)
+  , decoder ARM [ARM_EXT_V1]    0x0f000000 0x0f000000 (SVC  <$> integral 0 23)
 
   , decoder ARM [ARM_EXT_V1]    0x00000000 0x00000000 (pure Undefined)
   ]

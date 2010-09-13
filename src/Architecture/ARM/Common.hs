@@ -43,6 +43,10 @@ data Condition = EQ | NE | CS | CC | MI | PL | VS | VC
                | HI | LS | GE | LT | GT | LE | AL | UND
   deriving (Show, Read, Eq, Enum)
 
+data ITSpecifier = Nil | T | E | TT | ET | TE | EE | TTT 
+                 | ETT | TET | EET | TTE | ETE | TEE | EEE
+  deriving (Show, Read, Eq, Enum)
+
 data StatusRegister = CPSR | SPSR
   deriving (Show, Read, Eq, Ord, Enum)
 

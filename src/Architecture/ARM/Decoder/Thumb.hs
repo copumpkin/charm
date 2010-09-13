@@ -51,6 +51,10 @@ noneSet start end = (== 0) . bitRange start end
 integral :: (Integral a, Bits a) => Int -> Int -> D a
 integral start end i = bitRange start end i
 
+bit b i = bitRange b b i
+
+bool b s = bit b s == 1
+
 reg :: Int -> D Register
 reg start = toEnum . bitRange start (start + 2)
 
@@ -60,7 +64,26 @@ reg4 start = toEnum . bitRange start (start + 3)
 branch :: D Word32
 branch = liftA2 (.|.) ((`shiftL` 1) . integral 3 7) ((`shiftL` 6) . integral 9 9)
 
-ifthen = undefined
+ifthen :: D ITSpecifier
+ifthen = 
+  do bs <- mapM bool [4,3..0]
+     case bs of
+       [fc, True, False, False, False] -> return Nil
+       [fc, m3  , True , False, False] | m3 == fc -> return T
+       [fc, m3  , True , False, False] | m3 == fc -> return E
+       [fc, m3  , m2   , True , False] | m3 == fc && m2 == fc -> return TT
+       [fc, m3  , m2   , True , False] | m3 /= fc && m2 == fc -> return ET
+       [fc, m3  , m2   , True , False] | m3 == fc && m2 /= fc -> return TE
+       [fc, m3  , m2   , True , False] | m3 /= fc && m2 /= fc -> return EE
+       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 == fc && m1 == fc -> return TTT
+       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 == fc && m1 == fc -> return ETT
+       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 /= fc && m1 == fc -> return TET
+       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 /= fc && m1 == fc -> return EET
+       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 == fc && m1 /= fc -> return TTE
+       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 == fc && m1 /= fc -> return ETE
+       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 /= fc && m1 /= fc -> return TEE
+       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 /= fc && m1 /= fc -> return EEE
+
 
 
 thumbDecoders = 
@@ -89,7 +112,7 @@ thumbDecoders =
   , decoder Thumb [ARM_EXT_V5T]  0xbe00 0xff00 (BKPT <$> integral 0 8) -- "bkpt\t%0-7x"}, /* Is always unconditional.  */
   
   -- Unconditional, but not BLXUC. We need another BLX? Or just make it take a DataOp
-  --, decoder Thumb [ARM_EXT_V5T] 0x4780 0xff87 (BLX <*> reg4) -- "blx%c\t%3-6r%x"},	/* note: 4 bit register number.  */
+  , decoder Thumb [ARM_EXT_V5T]  0x4780 0xff87 (blxc <$> (Reg <$> reg4 3)) -- "blx%c\t%3-6r%x"},	/* note: 4 bit register number.  */
   
   , decoder Thumb [ARM_EXT_V4T]  0x46C0 0xFFFF (pure NOP) -- "nop%c\t\t\t; (mov r8, r8)"},
 
