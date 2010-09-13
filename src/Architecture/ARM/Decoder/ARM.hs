@@ -377,8 +377,8 @@ armDecoders =
   , decoder ARM [ARM_EXT_V5J]   0x012fff20 0x0ffffff0 (BXJ <$> reg 0)
  
   , decoder ARM [ARM_EXT_V5]    0xe1200070 0xfff000f0 (BKPT <$> ((\x y -> x `shiftL` 4 .|. y) <$> integral 8 19 <*> integral 0 3)) 
-  , decoder ARM [ARM_EXT_V5]    0xfa000000 0xfe000000 (BLXUC <$> arm_B)
-  , decoder ARM [ARM_EXT_V5]    0x012fff30 0x0ffffff0 (BLX <$> reg 0)
+  , decoder ARM [ARM_EXT_V5]    0xfa000000 0xfe000000 ((BLX :: DataOp -> Instruction UAL Unconditional) <$> (Imm <$> arm_B))
+  , decoder ARM [ARM_EXT_V5]    0x012fff30 0x0ffffff0 ((BLX :: DataOp -> Instruction UAL Conditional)   <$> (Reg <$> reg 0))
   , decoder ARM [ARM_EXT_V5]    0x016f0f10 0x0fff0ff0 (CLZ <$> reg 12 <*> reg 0)
   
   , decoder ARM [ARM_EXT_V5E]   0x000000d0 0x0e1000f0 (LDRD <$> reg 12 <*> arm_s)

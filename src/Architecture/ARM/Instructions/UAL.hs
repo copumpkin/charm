@@ -30,11 +30,11 @@ data MultiRegOp = Regs [Register]
 
 instance InstructionSet UAL where
   data Instruction UAL c where
-    B   :: Int32    -> Instruction UAL Conditional
-    BL  :: Int32    -> Instruction UAL Conditional
-    BX  :: Register -> Instruction UAL Conditional
-    BLX :: Register -> Instruction UAL Conditional
-    BXJ :: Register -> Instruction UAL Conditional
+    B   :: Int32     -> Instruction UAL Conditional
+    BL  :: Int32     -> Instruction UAL Conditional
+    BX  :: Register  -> Instruction UAL Conditional
+    BLX :: DataOp    -> Instruction UAL a           -- Supports both conditional and unconditional forms! ArmOpData can only be Reg or Imm. Maybe one day we'll enforce that, but it'll make things ugly.
+    BXJ :: Register  -> Instruction UAL Conditional
     
     AND  :: Register -> Register -> DataOp -> Instruction UAL Conditional
     ANDS :: Register -> Register -> DataOp -> Instruction UAL Conditional
@@ -327,7 +327,6 @@ instance InstructionSet UAL where
     SRSIB  :: Bool -> Register -> Word32 -> Instruction UAL Unconditional -- the register is always SP/R13
     
     CLREX  :: Instruction UAL Unconditional
-    BLXUC  :: Int32 -> Instruction UAL Unconditional -- unconditional BLX
 
     CBNZ   :: Register -> Word32 -> Instruction UAL Unconditional
     CBZ    :: Register -> Word32 -> Instruction UAL Unconditional

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, GADTs, EmptyDataDecls, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, GADTs, EmptyDataDecls, FlexibleContexts, RankNTypes #-}
 module Architecture.ARM.Common where
 
 import Data.Bits
@@ -72,9 +72,21 @@ data Unconditional
 
 
 data GeneralInstruction a where
-  Conditional   :: Condition -> Instruction a Conditional -> GeneralInstruction a
-  Unconditional :: Instruction a Unconditional -> GeneralInstruction a
   Undefined     :: GeneralInstruction a
+  Unconditional :: Instruction a Unconditional -> GeneralInstruction a
+  Conditional   :: Condition -> Instruction a Conditional -> GeneralInstruction a
+
+
+
+generalInstruction :: r -> (Instruction a Unconditional -> r) -> (Condition -> Instruction a Conditional -> r) -> GeneralInstruction a -> r
+generalInstruction ud _ _ Undefined = ud
+generalInstruction _ uc _ (Unconditional i) = uc i
+generalInstruction _ _  c (Conditional x i) = c x i
+
+fromGeneralInstruction :: r -> (forall c. Instruction a c -> r) -> GeneralInstruction a -> r
+fromGeneralInstruction ud f Undefined = ud
+fromGeneralInstruction ud f (Unconditional i) = f i
+fromGeneralInstruction ud f (Conditional _ i) = f i
 
 class InstructionSet a where
   data Instruction a :: * -> *
