@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, GADTs, EmptyDataDecls, FlexibleContexts, RankNTypes #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, GADTs, EmptyDataDecls, FlexibleContexts, FlexibleInstances, RankNTypes #-}
 module Architecture.ARM.Common where
 
 import Data.Bits
@@ -100,21 +100,25 @@ type family Word a :: *
 
 
 
-data GeneralDecoder w i = GeneralDecoder { _subarchs :: [Subarch]
-                                         , _value    :: w
-                                         , _mask     :: w
-                                         , _decoder  :: w -> i
+data GeneralDecoder a i = GeneralDecoder { _subarchs :: [Subarch]
+                                         , _value    :: Word a
+                                         , _mask     :: Word a
+                                         , _decoder  :: Word a -> i
                                          }
 
-decoderMatches :: Bits (Word e) => e -> Word e -> GeneralDecoder (Word e) i -> Bool
+decoderMatches :: Bits (Word e) => e -> Word e -> GeneralDecoder e i -> Bool
 decoderMatches _ x (GeneralDecoder _ v m _) = x .&. m == v 
 
-decode :: e -> Word e -> GeneralDecoder (Word e) i -> i
+decode :: e -> Word e -> GeneralDecoder e i -> i
 decode _ x (GeneralDecoder _ _ _ d) = d x
 
 
 class Decoder e i where
-  type DecoderType e i :: *
+  type Target e i :: *
   
-  decoder :: e -> [Subarch] -> Word e -> Word e -> (Word e -> i) -> DecoderType e i
+  decoder :: [Subarch] -> Word e -> Word e -> (Word e -> i) -> GeneralDecoder e (Target e i)
 
+instance Decoder a (GeneralInstruction i) where
+  type Target a (GeneralInstruction i) = GeneralInstruction i
+
+  decoder s v m d = GeneralDecoder s v m d
