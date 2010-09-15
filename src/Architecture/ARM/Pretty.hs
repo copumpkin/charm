@@ -73,45 +73,81 @@ showMultiRegOp (Regs rs) = "{" ++ (intercalate ", " . map showRegister $ rs) ++ 
 showMultiRegOp (RegsCaret rs) = "{" ++ (intercalate ", " . map showRegister $ rs) ++ "}^"
 
 showInstruction :: Instruction UAL c -> String
-showInstruction (B off)               = printf "B%%s 0x%x" off
-showInstruction (BL off)              = printf "BL%%s 0x%x" off
-showInstruction (BLX d)               = printf "BLX%%s %s" (showDataOp d)
-showInstruction (BX  rd)              = printf "BX%%s %s"  (showRegister rd)
-showInstruction (BXJ rd)              = printf "BXJ%%s %s" (showRegister rd)
-showInstruction (AND  rd rn k)        = printf "AND%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (ANDS rd rn k)        = printf "ANDS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (EOR  rd rn k)        = printf "EOR%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (EORS rd rn k)        = printf "EORS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (SUB  rd rn k)        = printf "SUB%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (SUBS rd rn k)        = printf "SUBS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (RSB  rd rn k)        = printf "RSB%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (RSBS rd rn k)        = printf "RSBS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (ADD  rd rn k)        = printf "ADD%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (ADDS rd rn k)        = printf "ADDS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (ADC  rd rn k)        = printf "ADC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (ADCS rd rn k)        = printf "ADCS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (SBC  rd rn k)        = printf "SBC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (SBCS rd rn k)        = printf "SBCS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (RSC  rd rn k)        = printf "RSC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (RSCS rd rn k)        = printf "RSCS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (B off)                    = printf "B%%s 0x%x" off
+showInstruction (BL off)                   = printf "BL%%s 0x%x" off
+showInstruction (BLX d)                    = printf "BLX%%s %s" (showDataOp d)
+showInstruction (BX  rd)                   = printf "BX%%s %s"  (showRegister rd)
+showInstruction (BXJ rd)                   = printf "BXJ%%s %s" (showRegister rd)
+showInstruction (AND  rd rn k) | rd == rn  = printf "AND%%s %s, %s"      (showRegister rd) (showDataOp k)
+                               | otherwise = printf "AND%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (ANDS rd rn k) | rd == rn  = printf "ANDS%%s %s, %s"     (showRegister rd) (showDataOp k)
+                               | otherwise = printf "ANDS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (EOR  rd rn k) | rd == rn  = printf "EOR%%s %s, %s"      (showRegister rd) (showDataOp k)
+                               | otherwise = printf "EOR%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (EORS rd rn k) | rd == rn  = printf "EORS%%s %s, %s"     (showRegister rd) (showDataOp k)
+                               | otherwise = printf "EORS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (SUB  rd rn k) | rd == rn  = printf "SUB%%s %s, %s"      (showRegister rd) (showDataOp k)
+                               | otherwise = printf "SUB%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (SUBS rd rn k) | rd == rn  = printf "SUBS%%s %s, %s"     (showRegister rd) (showDataOp k)
+                               | otherwise = printf "SUBS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (RSB  rd rn k) | rd == rn  = printf "RSB%%s %s, %s"      (showRegister rd) (showDataOp k)
+                               | otherwise = printf "RSB%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (RSBS rd rn k) | rd == rn  = printf "RSBS%%s %s, %s"     (showRegister rd) (showDataOp k)
+                               | otherwise = printf "RSBS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (ADD  rd rn k) | rd == rn  = printf "ADD%%s %s, %s"      (showRegister rd) (showDataOp k)
+                               | otherwise = printf "ADD%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (ADDS rd rn k) | rd == rn  = printf "ADDS%%s %s, %s"     (showRegister rd) (showDataOp k)
+                               | otherwise = printf "ADDS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (ADC  rd rn k) | rd == rn  = printf "ADC%%s %s, %s"      (showRegister rd) (showDataOp k)
+                               | otherwise = printf "ADC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (ADCS rd rn k) | rd == rn  = printf "ADCS%%s %s, %s"     (showRegister rd) (showDataOp k)
+                               | otherwise = printf "ADCS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (SBC  rd rn k) | rd == rn  = printf "SBC%%s %s, %s"      (showRegister rd) (showDataOp k)
+                               | otherwise = printf "SBC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (SBCS rd rn k) | rd == rn  = printf "SBCS%%s %s, %s"     (showRegister rd) (showDataOp k)
+                               | otherwise = printf "SBCS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (RSC  rd rn k) | rd == rn  = printf "RSC%%s %s, %s"      (showRegister rd) (showDataOp k)
+                               | otherwise = printf "RSC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (RSCS rd rn k) | rd == rn  = printf "RSCS%%s %s, %s"     (showRegister rd) (showDataOp k)
+                               | otherwise = printf "RSCS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (ORR  rd rn k) | rd == rn  = printf "ORR%%s %s, %s"      (showRegister rd) (showDataOp k)
+                               | otherwise = printf "ORR%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp k)
+showInstruction (ORRS rd rn k) | rd == rn  = printf "ORRS%%s %s, %s"     (showRegister rd) (showDataOp k)
+                               | otherwise = printf "ORRS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
+
 showInstruction (TST rn d)            = printf "TST%%s %s, %s" (showRegister rn) (showDataOp d)
 showInstruction (TEQ rn d)            = printf "TEQ%%s %s, %s" (showRegister rn) (showDataOp d)
 showInstruction (CMP rn d)            = printf "CMP%%s %s, %s" (showRegister rn) (showDataOp d)
 showInstruction (CMN rn d)            = printf "CMN%%s %s, %s" (showRegister rn) (showDataOp d)
-showInstruction (ORR  rd rn k)        = printf "ORR%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
-showInstruction (ORRS rd rn k)        = printf "ORRS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp k)
 showInstruction (MOV  rd d)           = printf "MOV%%s %s, %s"  (showRegister rd) (showDataOp d)
 showInstruction (MOVS rd d)           = printf "MOVS%%s %s, %s" (showRegister rd) (showDataOp d)
-showInstruction (LSL  rd d)           = printf "LSL%%s %s, %s"  (showRegister rd) (showDataOp d)
-showInstruction (LSLS rd d)           = printf "LSLS%%s %s, %s" (showRegister rd) (showDataOp d)
-showInstruction (LSR  rd d)           = printf "LSR%%s %s, %s"  (showRegister rd) (showDataOp d)
-showInstruction (LSRS rd d)           = printf "LSRS%%s %s, %s" (showRegister rd) (showDataOp d)
-showInstruction (ASR  rd d)           = printf "ASR%%s %s, %s"  (showRegister rd) (showDataOp d)
-showInstruction (ASRS rd d)           = printf "ASRS%%s %s, %s" (showRegister rd) (showDataOp d)
+
+showInstruction (LSL  rd (RegShiftImm S_LSL i r)) = printf "LSL%%s %s, %s, #%i"  (showRegister rd) (showRegister r) i
+showInstruction (LSL  rd d)                       = printf "LSL%%s %s, %s"       (showRegister rd) (showDataOp d)
+
+showInstruction (LSLS rd (RegShiftImm S_LSL i r)) = printf "LSLS%%s %s, %s, #%i" (showRegister rd) (showRegister r) i
+showInstruction (LSLS rd d)                       = printf "LSLS%%s %s, %s"      (showRegister rd) (showDataOp d)
+
+showInstruction (LSR  rd (RegShiftImm S_LSR i r)) = printf "LSR%%s %s, %s, #%i"  (showRegister rd) (showRegister r) i
+showInstruction (LSR  rd d)                       = printf "LSR%%s %s, %s"       (showRegister rd) (showDataOp d)
+
+showInstruction (LSRS rd (RegShiftImm S_LSR i r)) = printf "LSRS%%s %s, %s, #%i" (showRegister rd) (showRegister r) i
+showInstruction (LSRS rd d)                       = printf "LSRS%%s %s, %s"      (showRegister rd) (showDataOp d)
+
+showInstruction (ASR  rd (RegShiftImm S_ASR i r)) = printf "ASR%%s %s, %s, #%i"  (showRegister rd) (showRegister r) i
+showInstruction (ASR  rd d)                       = printf "ASR%%s %s, %s"       (showRegister rd) (showDataOp d)
+
+showInstruction (ASRS rd (RegShiftImm S_ASR i r)) = printf "ASRS%%s %s, %s, #%i" (showRegister rd) (showRegister r) i
+showInstruction (ASRS rd d)                       = printf "ASRS%%s %s, %s"      (showRegister rd) (showDataOp d)
+
+showInstruction (ROR  rd (RegShiftImm S_ROR i r)) = printf "ROR%%s %s, %s, #%i"  (showRegister rd) (showRegister r) i
+showInstruction (ROR  rd d)                       = printf "ROR%%s %s, %s"       (showRegister rd) (showDataOp d)
+
+showInstruction (RORS rd (RegShiftImm S_ROR i r)) = printf "RORS%%s %s, %s, #%i" (showRegister rd) (showRegister r) i
+showInstruction (RORS rd d)                       = printf "RORS%%s %s, %s"      (showRegister rd) (showDataOp d)
+
 showInstruction (RRX  rd rm)          = printf "RRX%%s %s, %s"  (showRegister rd) (showRegister rm)
 showInstruction (RRXS rd rm)          = printf "RRXS%%s %s, %s" (showRegister rd) (showRegister rm)
-showInstruction (ROR  rd d)           = printf "ROR%%s %s, %s"  (showRegister rd) (showDataOp d)
-showInstruction (RORS rd d)           = printf "RORS%%s %s, %s" (showRegister rd) (showDataOp d)
 showInstruction (BIC  rd rn d)        = printf "BIC%%s %s, %s, %s"  (showRegister rd) (showRegister rn) (showDataOp d)
 showInstruction (BICS rd rn d)        = printf "BICS%%s %s, %s, %s" (showRegister rd) (showRegister rn) (showDataOp d)
 showInstruction (MVN  rd d)           = printf "MVN%%s %s, %s"  (showRegister rd) (showDataOp d)
@@ -303,6 +339,7 @@ showInstruction (SRSDA b r imm32)     = "SRSDA" -- FIX
 showInstruction (SRSDB b r imm32)     = "SRSDB" -- FIX
 showInstruction (SRSIB b r imm32)     = "SRSIB" -- FIX
 showInstruction CLREX                 = "CLREX"
+showInstruction i                     = error "dunno how to print instruction '" ++ (show i) ++ "'"
 
 showGeneralInstruction :: GeneralInstruction UAL -> String
 showGeneralInstruction Undefined = "UNDEFINED INSTRUCTION"

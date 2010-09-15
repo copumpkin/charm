@@ -10,19 +10,30 @@ import System.Directory
 import System.Exit
 
 import Control.Monad
-import Control.Applicative
+import Control.Applicative hiding ((<|>))
+import Control.Arrow
 
 import Data.List
 import Data.Char
 import Data.Either
+import Data.Function
 
 import Text.Parsec
 import Text.Parsec.String
 
+trim = concat . init . tail . groupBy ((==) `on` isSpace) . (" " ++) . (++ " ")
+
 -- I should probably do this more efficiently, but whatever
-parser :: Parser String
-parser = spaces *> many1 hexDigit *> char ':' *> spaces *> many1 hexDigit *> spaces *> 
-         manyTill anyChar (choice [eof, try (spaces *> char ';') *> pure ()])
+parser :: Parser (String, Either Word32 (Word16, Word16))
+parser = 
+  do spaces *> many1 hexDigit *> char ':' *> spaces
+     val <- trim <$> many1 (char ' ' <|> hexDigit)
+     char '\t'
+     instruction <- manyTill anyChar (choice [eof, try (spaces *> char ';') *> pure ()])
+     let (x, y) = break (== ' ') val
+     if ' ' `elem` val
+       then return (instruction, Right (read ("0x" ++ x), read ("0x" ++ tail y)))
+       else return (instruction, Left (read ("0x" ++ val)))
 
 deTab :: String -> String
 deTab = map f
@@ -43,6 +54,16 @@ disassemble cmd args ws = withTempFile $ \path h ->
      hFlush h
      out <- readProcess cmd (args ++ ["-D", path]) ""
      let instructions = [parse parser "" line | line <- lines out]
-     return . map deTab . rights $ instructions
+     return . map (deTab . fst) . rights $ instructions
 
 
+
+disassemble16 :: FilePath -> [String] -> [Word16] -> IO [(String, Either Word16 (Word16, Word16))]
+disassemble16 cmd args ws = withTempFile $ \path h ->
+  do L.hPut h . runPut . mapM_ putWord16le $ ws
+     hFlush h
+     out <- readProcess cmd (args ++ ["-D", path]) ""
+     -- putStrLn out
+     let instructions = [parse parser "" line | line <- lines out]
+     -- mapM_ print instructions
+     return . map (deTab *** either (Left . fromIntegral) Right) . rights $ instructions

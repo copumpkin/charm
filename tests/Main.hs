@@ -6,6 +6,7 @@ import Data.Word
 import Architecture.ARM.Common
 import Architecture.ARM.Instructions.UAL
 import Architecture.ARM.Decoder.ARM
+import Architecture.ARM.Decoder.Thumb
 import Architecture.ARM.Pretty
 
 import Test.Framework (defaultMain, testGroup)
@@ -22,6 +23,8 @@ import Data.Maybe
 
 import Text.Printf
 
+-- FIXME: ICK, make this whole test setup less ugly
+
 ualMatches :: Word32 -> GeneralInstruction UAL -> String -> Assertion
 ualMatches off i@(Conditional _ _) s | "invalid" `isInfixOf` s || "undefined" `isInfixOf` s || null s = assertFailure (printf "invalid instruction '%s' decoded to '%s'" s (showGeneralInstruction i))
 ualMatches off i@(Unconditional _) s | "invalid" `isInfixOf` s || "undefined" `isInfixOf` s || null s = assertFailure (printf "invalid instruction '%s' decoded to '%s'" s (showGeneralInstruction i))
@@ -30,18 +33,45 @@ ualMatches off x ('s':'t':'m':'i':'a':r) = ualMatches off x $ 's':'t':'m':r
 ualMatches off x ('l':'d':'m':'i':'a':r) = ualMatches off x $ 'l':'d':'m':r
 ualMatches off (Conditional cond (B op)) s = map toLower (showGeneralInstruction (Conditional cond (B $ op + (fromIntegral off)))) @?= s
 ualMatches off (Conditional cond (BL op)) s = map toLower (showGeneralInstruction (Conditional cond (BL $ op + (fromIntegral off)))) @?= s
-ualMatches off (Unconditional (BLXUC op)) s = map toLower (showGeneralInstruction (Unconditional (BLXUC $ op + (fromIntegral off)))) @?= s
+ualMatches off (Unconditional (BLX (Imm op))) s = map toLower (showGeneralInstruction (Unconditional (BLX (Imm $ op + (fromIntegral off))))) @?= s
 ualMatches off x s = map toLower (showGeneralInstruction x) @?= s
 
-main = 
+testDecoder16 f s a = 
   do rs <- fmap (take 1000 . randoms) getStdGen
-     let ws = map fromIntegral (rs :: [Int]) :: [Word32]
-     insns <- disassemble "/Users/pumpkin/summon-arm-toolchain/sources/src/binutils/objdump" ["-b", "binary", "-m", "arm"] ws
-     let ours = map armDecode ws
+     let ws = map fromIntegral (rs :: [Int]) 
+     insns <- disassemble16 "/Users/pumpkin/summon-arm-toolchain/sources/src/binutils/objdump" (["-b", "binary", "-m", "arm", "-M", "force-thumb"] ++ a) ws
+     let ours = map (\(_, x) -> either f (f . fst) x) insns
+     let tests = zipWith4 (\off w o u -> testCase (printf "0x%04x: 0x%04x %s" off w u) (ualMatches off o u)) [0,2..] (map (either id fst . snd) insns) ours (map fst insns)
+     return $ testGroup (s ++ " decoder") tests
+
+testDecoder d f s a = 
+  do rs <- fmap (take 100 . randoms) getStdGen
+     let ws = map fromIntegral (rs :: [Int]) 
+     insns <- disassemble "/Users/pumpkin/summon-arm-toolchain/sources/src/binutils/objdump" (["-b", "binary", "-m", "arm"] ++ a) ws
+     let ours = map f ws
      let tests = zipWith4 (\off w o u -> testCase (printf "0x%08x: 0x%08x %s" off w u) (ualMatches off o u)) [0,4..] ws ours insns
-     defaultMain [testGroup "Instructions from objdump" tests]
+     return $ testGroup (s ++ " decoder") tests
+
+main = defaultMain =<< sequence [{-testDecoder armDecode "ARM" [],-} testDecoder16 thumbDecode "Thumb" ["-M", "force-thumb"]]
 
 {-
+Thumb issues
+===============
+
+  0x006c: 0x5f0b ldrsh r3, [r1, r4]: [Failed]
+Failed: expected: "ldrsh r3, [r1, r4]"
+ but got: "ldrsb r3, [r1, r4]"
+
+  0x0024: 0x4c6c ldr r4, [pc, #432]: [Failed]
+Failed: expected: "ldr r4, [pc, #432]"
+ but got: "ldr r4, [pc, #108]"
+
+-}
+
+{-
+ARM issues
+================
+
   0x000002f8: 0x4141fb0a mrsmi pc, SPSR: [Failed]
 Failed: expected: "mrsmi pc, SPSR"
  but got: "mrsmi pc, cpsr"

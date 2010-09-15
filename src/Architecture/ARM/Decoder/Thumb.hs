@@ -108,6 +108,7 @@ ifthen =
        [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 == fc && m1 /= fc -> return ETE
        [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 /= fc && m1 /= fc -> return TEE
        [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 /= fc && m1 /= fc -> return EEE
+       _ -> return Nil -- Eww
 
 
 thumbDecoders :: [GeneralDecoder Thumb (GeneralInstruction UAL)]
@@ -140,22 +141,22 @@ thumbDecoders =
   
   , decoder [ARM_EXT_V4T]  0x46C0 0xFFFF (pure NOP) -- "nop%c\t\t\t; (mov r8, r8)"},
 
-  , decoder [ARM_EXT_V4T]  0x4000 0xFFC0 (AND  <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "and%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x4040 0xFFC0 (EOR  <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "eor%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x4080 0xFFC0 (LSL  <$> reg 0 <*> (Reg <$> reg 3)) -- "lsl%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x40C0 0xFFC0 (LSR  <$> reg 0 <*> (Reg <$> reg 3)) -- "lsr%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x4100 0xFFC0 (ASR  <$> reg 0 <*> (Reg <$> reg 3)) -- "asr%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x4140 0xFFC0 (ADC  <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "adc%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x4180 0xFFC0 (SBC  <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "sbc%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x41C0 0xFFC0 (ROR  <$> reg 0 <*> (Reg <$> reg 3)) -- "ror%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x4000 0xFFC0 (ANDS <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "and%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x4040 0xFFC0 (EORS <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "eor%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x4080 0xFFC0 (LSLS <$> reg 0 <*> (Reg <$> reg 3)) -- "lsl%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x40C0 0xFFC0 (LSRS <$> reg 0 <*> (Reg <$> reg 3)) -- "lsr%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x4100 0xFFC0 (ASRS <$> reg 0 <*> (Reg <$> reg 3)) -- "asr%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x4140 0xFFC0 (ADCS <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "adc%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x4180 0xFFC0 (SBCS <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "sbc%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x41C0 0xFFC0 (RORS <$> reg 0 <*> (Reg <$> reg 3)) -- "ror%C\t%0-2r, %3-5r"},
   , decoder [ARM_EXT_V4T]  0x4200 0xFFC0 (TST  <$> reg 0 <*> (Reg <$> reg 3)) -- "tst%c\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x4240 0xFFC0 (RSB  <$> reg 0 <*> reg 3 <*> pure (Imm 0)) -- "neg%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x4240 0xFFC0 (RSBS <$> reg 0 <*> reg 3 <*> pure (Imm 0)) -- "neg%C\t%0-2r, %3-5r"},
   , decoder [ARM_EXT_V4T]  0x4280 0xFFC0 (CMP  <$> reg 0 <*> (Reg <$> reg 3)) -- "cmp%c\t%0-2r, %3-5r"},
   , decoder [ARM_EXT_V4T]  0x42C0 0xFFC0 (CMN  <$> reg 0 <*> (Reg <$> reg 3)) -- "cmn%c\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x4300 0xFFC0 (ORR  <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "orr%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x4340 0xFFC0 (MUL  <$> reg 0 <*> reg 0 <*> reg 3) -- "mul%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x4380 0xFFC0 (BIC  <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "bic%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x43C0 0xFFC0 (MVN  <$> reg 0 <*> (Reg <$> reg 3)) -- "mvn%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x4300 0xFFC0 (ORRS <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "orr%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x4340 0xFFC0 (MULS <$> reg 0 <*> reg 0 <*> reg 3) -- "mul%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x4380 0xFFC0 (BICS <$> reg 0 <*> reg 0 <*> (Reg <$> reg 3)) -- "bic%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x43C0 0xFFC0 (MVNS <$> reg 0 <*> (Reg <$> reg 3)) -- "mvn%C\t%0-2r, %3-5r"},
   
   , decoder [ARM_EXT_V4T]  0xB000 0xFF80 (ADD SP <$> pure SP <*> (Imm <$> ((`shiftL` 2) . integral 0 6))) -- "add%c\tsp, #%0-6W"},
   , decoder [ARM_EXT_V4T]  0xB080 0xFF80 (SUB SP <$> pure SP <*> (Imm <$> ((`shiftL` 2) . integral 0 6))) -- "sub%c\tsp, #%0-6W"},
@@ -168,29 +169,29 @@ thumbDecoders =
   , decoder [ARM_EXT_V4T]  0xB400 0xFE00 (PUSH <$> pushRegs) -- "push%c\t%N"},
   , decoder [ARM_EXT_V4T]  0xBC00 0xFE00 (POP  <$> popRegs) -- "pop%c\t%O"},
   
-  , decoder [ARM_EXT_V4T]  0x1800 0xFE00 (ADD  <$> reg 0 <*> reg 3 <*> (Reg <$> reg 6)) -- "add%C\t%0-2r, %3-5r, %6-8r"},
-  , decoder [ARM_EXT_V4T]  0x1A00 0xFE00 (SUB  <$> reg 0 <*> reg 3 <*> (Reg <$> reg 6)) -- "sub%C\t%0-2r, %3-5r, %6-8r"},
-  , decoder [ARM_EXT_V4T]  0x1C00 0xFE00 (ADD  <$> reg 0 <*> reg 3 <*> (Imm <$> integral 6 8)) -- "add%C\t%0-2r, %3-5r, #%6-8d"},
-  , decoder [ARM_EXT_V4T]  0x1E00 0xFE00 (SUB  <$> reg 0 <*> reg 3 <*> (Imm <$> integral 6 8)) -- "sub%C\t%0-2r, %3-5r, #%6-8d"},
+  , decoder [ARM_EXT_V4T]  0x1800 0xFE00 (ADDS <$> reg 0 <*> reg 3 <*> (Reg <$> reg 6)) -- "add%C\t%0-2r, %3-5r, %6-8r"},
+  , decoder [ARM_EXT_V4T]  0x1A00 0xFE00 (SUBS <$> reg 0 <*> reg 3 <*> (Reg <$> reg 6)) -- "sub%C\t%0-2r, %3-5r, %6-8r"},
+  , decoder [ARM_EXT_V4T]  0x1C00 0xFE00 (ADDS <$> reg 0 <*> reg 3 <*> (Imm <$> integral 6 8)) -- "add%C\t%0-2r, %3-5r, #%6-8d"},
+  , decoder [ARM_EXT_V4T]  0x1E00 0xFE00 (SUBS <$> reg 0 <*> reg 3 <*> (Imm <$> integral 6 8)) -- "sub%C\t%0-2r, %3-5r, #%6-8d"},
   
   , decoder [ARM_EXT_V4T]  0x5200 0xFE00 (STRH <$> reg 0 <*> (MemReg <$> reg 3 <*> (Reg <$> reg 6) <*> pure False)) -- "strh%c\t%0-2r, [%3-5r, %6-8r]"},
   , decoder [ARM_EXT_V4T]  0x5A00 0xFE00 (LDRH <$> reg 0 <*> (MemReg <$> reg 3 <*> (Reg <$> reg 6) <*> pure False)) -- "ldrh%c\t%0-2r, [%3-5r, %6-8r]"},
-  , decoder [ARM_EXT_V4T]  0x5600 0xF600 (ldr  <$> choose 11 Halfword Byte <*> pure False <*> pure True <*> reg 0 <*> (MemReg <$> reg 3 <*> (Reg <$> reg 6) <*> pure False)) -- "ldrs%11?hb%c\t%0-2r, [%3-5r, %6-8r]"},
+  , decoder [ARM_EXT_V4T]  0x5600 0xF600 (ldr  <$> choose 11 Byte Halfword <*> pure False <*> pure True <*> reg 0 <*> (MemReg <$> reg 3 <*> (Reg <$> reg 6) <*> pure False)) -- "ldrs%11?hb%c\t%0-2r, [%3-5r, %6-8r]"},
   
   , decoder [ARM_EXT_V4T]  0x5000 0xFA00 (str  <$> choose 10 Word Byte <*> pure False <*> reg 0 <*> (MemReg <$> reg 3 <*> (Reg <$> reg 6) <*> pure False)) -- "str%10'b%c\t%0-2r, [%3-5r, %6-8r]"},
   , decoder [ARM_EXT_V4T]  0x5800 0xFA00 (ldr  <$> choose 10 Word Byte <*> pure False <*> pure False <*> reg 0 <*> (MemReg <$> reg 3 <*> (Reg <$> reg 6) <*> pure False)) -- "ldr%10'b%c\t%0-2r, [%3-5r, %6-8r]"},
 
-  , decoder [ARM_EXT_V4T]  0x0000 0xFFC0 (MOV  <$> reg 0 <*> (Reg <$> reg 3)) -- "mov%C\t%0-2r, %3-5r"},
-  , decoder [ARM_EXT_V4T]  0x0000 0xF800 (LSL  <$> reg 0 <*> (RegShiftImm S_LSL <$> integral 6 10 <*> reg 3)) -- "lsl%C\t%0-2r, %3-5r, #%6-10d"},
-  , decoder [ARM_EXT_V4T]  0x0800 0xF800 (LSR  <$> reg 0 <*> (RegShiftImm S_LSR <$> shift <*> reg 3)) -- "lsr%C\t%0-2r, %3-5r, %s"},
-  , decoder [ARM_EXT_V4T]  0x1000 0xF800 (ASR  <$> reg 0 <*> (RegShiftImm S_ASR <$> shift <*> reg 3)) -- "asr%C\t%0-2r, %3-5r, %s"},
+  , decoder [ARM_EXT_V4T]  0x0000 0xFFC0 (MOVS <$> reg 0 <*> (Reg <$> reg 3)) -- "mov%C\t%0-2r, %3-5r"},
+  , decoder [ARM_EXT_V4T]  0x0000 0xF800 (LSLS <$> reg 0 <*> (RegShiftImm S_LSL <$> integral 6 10 <*> reg 3)) -- "lsl%C\t%0-2r, %3-5r, #%6-10d"},
+  , decoder [ARM_EXT_V4T]  0x0800 0xF800 (LSRS <$> reg 0 <*> (RegShiftImm S_LSR <$> shift <*> reg 3)) -- "lsr%C\t%0-2r, %3-5r, %s"},
+  , decoder [ARM_EXT_V4T]  0x1000 0xF800 (ASRS <$> reg 0 <*> (RegShiftImm S_ASR <$> shift <*> reg 3)) -- "asr%C\t%0-2r, %3-5r, %s"},
 
-  , decoder [ARM_EXT_V4T]  0x2000 0xF800 (MOV  <$> reg 8 <*> (Imm <$> integral 0 7)) -- "mov%C\t%8-10r, #%0-7d"},
+  , decoder [ARM_EXT_V4T]  0x2000 0xF800 (MOVS <$> reg 8 <*> (Imm <$> integral 0 7)) -- "mov%C\t%8-10r, #%0-7d"},
   , decoder [ARM_EXT_V4T]  0x2800 0xF800 (CMP  <$> reg 8 <*> (Imm <$> integral 0 7)) -- "cmp%c\t%8-10r, #%0-7d"},
-  , decoder [ARM_EXT_V4T]  0x3000 0xF800 (ADD  <$> reg 8 <*> reg 8 <*> (Imm <$> integral 0 7)) -- "add%C\t%8-10r, #%0-7d"},
-  , decoder [ARM_EXT_V4T]  0x3800 0xF800 (SUB  <$> reg 8 <*> reg 8 <*> (Imm <$> integral 0 7)) -- "sub%C\t%8-10r, #%0-7d"},
+  , decoder [ARM_EXT_V4T]  0x3000 0xF800 (ADDS <$> reg 8 <*> reg 8 <*> (Imm <$> integral 0 7)) -- "add%C\t%8-10r, #%0-7d"},
+  , decoder [ARM_EXT_V4T]  0x3800 0xF800 (SUBS <$> reg 8 <*> reg 8 <*> (Imm <$> integral 0 7)) -- "sub%C\t%8-10r, #%0-7d"},
 
-  , decoder [ARM_EXT_V4T]  0x4800 0xF800 (LDR  <$> reg 8 <*> (MemReg PC <$> (Imm <$> integral 0 7) <*> pure False)) -- "ldr%c\t%8-10r, [pc, #%0-7W]\t; (%0-7a)"},  /* TODO: Disassemble PC relative "LDR rD,=<symbolic>" */
+  , decoder [ARM_EXT_V4T]  0x4800 0xF800 (LDR  <$> reg 8 <*> (MemReg PC <$> (Imm <$> ((`shiftL` 2) . integral 0 7)) <*> pure False)) -- "ldr%c\t%8-10r, [pc, #%0-7W]\t; (%0-7a)"},  /* TODO: Disassemble PC relative "LDR rD,=<symbolic>" */
 
   , decoder [ARM_EXT_V4T]  0x6000 0xF800 (STR  <$> reg 0 <*> (MemReg <$> reg 3 <*> (Imm <$> ((`shiftL` 2) . integral 6 10)) <*> pure False)) -- "str%c\t%0-2r, [%3-5r, #%6-10W]"},
   , decoder [ARM_EXT_V4T]  0x6800 0xF800 (LDR  <$> reg 0 <*> (MemReg <$> reg 3 <*> (Imm <$> ((`shiftL` 2) . integral 6 10)) <*> pure False)) -- "ldr%c\t%0-2r, [%3-5r, #%6-10W]"},
