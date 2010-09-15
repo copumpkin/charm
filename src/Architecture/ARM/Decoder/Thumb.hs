@@ -1,4 +1,4 @@
-{-# Language MultiParamTypeClasses, TypeFamilies, FlexibleInstances #-}
+{-# Language MultiParamTypeClasses, TypeFamilies, FlexibleInstances, FlexibleContexts #-}
 module Architecture.ARM.Decoder.Thumb where
 
 import Prelude hiding (and)
@@ -20,6 +20,10 @@ import Control.Applicative
 data Thumb = Thumb
 type instance Word Thumb = Word16
 
+-- Basically an iteratee
+data ThumbContinuation a = Done a | Word16 (Word16 -> ThumbContinuation a)
+
+
 instance Decoder Thumb (Instruction UAL Conditional) where
   type Target Thumb (Instruction UAL Conditional) = GeneralInstruction UAL
 
@@ -29,7 +33,6 @@ instance Decoder Thumb (Instruction UAL Unconditional) where
   type Target Thumb (Instruction UAL Unconditional) = GeneralInstruction UAL
   
   decoder s v m d = GeneralDecoder s v m (Unconditional <$> d)
-
 
 
 type D a = Word16 -> a
@@ -108,20 +111,24 @@ ifthen =
        [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 == fc && m1 /= fc -> return ETE
        [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 /= fc && m1 /= fc -> return TEE
        [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 /= fc && m1 /= fc -> return EEE
-       _ -> return Nil -- Eww
+       _ -> return Nil -- FIXME: Eww
 
 
 thumbDecoders :: [GeneralDecoder Thumb (GeneralInstruction UAL)]
 thumbDecoders = 
-  [ decoder [ARM_EXT_V6K]  0xbf00 0xffff (pure NOP)
+  [ decoder []             0xe800 0xf800 (pure (error "32-bit thumb" :: GeneralInstruction UAL))
+  , decoder []             0xf000 0xf800 (pure (error "32-bit thumb" :: GeneralInstruction UAL))
+  , decoder []             0xf800 0xf800 (pure (error "32-bit thumb" :: GeneralInstruction UAL))
+  
+  , decoder [ARM_EXT_V6K]  0xbf00 0xffff (pure NOP)
   , decoder [ARM_EXT_V6K]  0xbf10 0xffff (pure YIELD)
   , decoder [ARM_EXT_V6K]  0xbf20 0xffff (pure WFE)
   , decoder [ARM_EXT_V6K]  0xbf30 0xffff (pure WFI)
   , decoder [ARM_EXT_V6K]  0xbf40 0xffff (pure SEV)
   
-  , decoder [ARM_EXT_V6T2] 0xb900 0xfd00 (CBNZ <$> reg 0 <*> branch) -- "cbnz\t%0-2r, %b%X"},
-  , decoder [ARM_EXT_V6T2] 0xb100 0xfd00 (CBZ  <$> reg 0 <*> branch) -- "cbz\t%0-2r, %b%X"},
-  , decoder [ARM_EXT_V6T2] 0xbf00 0xff00 (IT   <$> ifthen) -- "it%I%X"},
+  , decoder [ARM_EXT_V6T2] 0xb900 0xfd00 (CBNZ   <$> reg 0 <*> branch) -- "cbnz\t%0-2r, %b%X"},
+  , decoder [ARM_EXT_V6T2] 0xb100 0xfd00 (CBZ    <$> reg 0 <*> branch) -- "cbz\t%0-2r, %b%X"},
+  , decoder [ARM_EXT_V6T2] 0xbf00 0xff00 (IT     <$> ifthen) -- "it%I%X"},
   
   , decoder [ARM_EXT_V6]   0xb660 0xfff8 (CPSIE  <$> bool 2 <*> bool 1 <*> bool 0 <*> pure Nothing) -- "cpsie\t%2'a%1'i%0'f%X"},
   , decoder [ARM_EXT_V6]   0xb670 0xfff8 (CPSID  <$> bool 2 <*> bool 1 <*> bool 0 <*> pure Nothing) -- "cpsid\t%2'a%1'i%0'f%X"},

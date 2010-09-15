@@ -29,6 +29,7 @@ ualMatches :: Word32 -> GeneralInstruction UAL -> String -> Assertion
 ualMatches off i@(Conditional _ _) s | "invalid" `isInfixOf` s || "undefined" `isInfixOf` s || null s = assertFailure (printf "invalid instruction '%s' decoded to '%s'" s (showGeneralInstruction i))
 ualMatches off i@(Unconditional _) s | "invalid" `isInfixOf` s || "undefined" `isInfixOf` s || null s = assertFailure (printf "invalid instruction '%s' decoded to '%s'" s (showGeneralInstruction i))
 ualMatches off Undefined s = assertBool "" True
+ualMatches off x ('b':c0:c1:'.':'n':r) = ualMatches off x $ 'b':c0:c1:r
 ualMatches off x ('s':'t':'m':'i':'a':r) = ualMatches off x $ 's':'t':'m':r
 ualMatches off x ('l':'d':'m':'i':'a':r) = ualMatches off x $ 'l':'d':'m':r
 ualMatches off (Conditional cond (B op)) s = map toLower (showGeneralInstruction (Conditional cond (B $ op + (fromIntegral off)))) @?= s
@@ -58,13 +59,9 @@ main = defaultMain =<< sequence [{-testDecoder armDecode "ARM" [],-} testDecoder
 Thumb issues
 ===============
 
-  0x006c: 0x5f0b ldrsh r3, [r1, r4]: [Failed]
-Failed: expected: "ldrsh r3, [r1, r4]"
- but got: "ldrsb r3, [r1, r4]"
-
-  0x0024: 0x4c6c ldr r4, [pc, #432]: [Failed]
-Failed: expected: "ldr r4, [pc, #432]"
- but got: "ldr r4, [pc, #108]"
+  0x06d0: 0x4495 add sp, r2: [Failed]
+Failed: expected: "add sp, r2"
+ but got: "add r5, r2"
 
 -}
 
