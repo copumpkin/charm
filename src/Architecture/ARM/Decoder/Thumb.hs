@@ -207,7 +207,7 @@ thumbDecoders =
   , decoder [ARM_EXT_V4T]  0xA800 0xF800 (ADD  <$> reg 8 <*> pure SP <*> (Imm <$> ((`shiftL` 2) . integral 0 7))) -- "add%c\t%8-10r, sp, #%0-7W"},
 
   , decoder [ARM_EXT_V4T]  0xC000 0xF800 (STM  True <$> reg 8 <*> (Regs <$> select registers <$> bits 0 7)) -- "stmia%c\t%8-10r!, %M"},
-  , decoder [ARM_EXT_V4T]  0xC800 0xF800 (LDM  <$> (elem <$> reg 8 <*> (select registers <$> bits 0 7)) <*> reg 8 <*> (Regs <$> select registers <$> bits 0 7)) -- FIXME: fugly -- "ldmia%c\t%8-10r%W, %M"},
+  , decoder [ARM_EXT_V4T]  0xC800 0xF800 (LDM  <$> (notElem <$> reg 8 <*> (select registers <$> bits 0 7)) <*> reg 8 <*> (Regs <$> select registers <$> bits 0 7)) -- FIXME: fugly -- "ldmia%c\t%8-10r%W, %M"},
                                                
   , decoder [ARM_EXT_V4T]  0xDF00 0xFF00 (SVC  <$> integral 0 7) -- "svc%c\t%0-7d"}, 
 
@@ -218,3 +218,11 @@ thumbDecoders =
   
   , decoder [ARM_EXT_V1]   0x0000 0x000 (pure Undefined)
   ]
+
+
+thumbDecode :: Word16 -> GeneralInstruction UAL
+thumbDecode i = fromMaybe Undefined . fmap (decode Thumb i) . find (decoderMatches Thumb i) $ thumbDecoders
+
+thumbDecodeDbg :: Word16 -> (GeneralInstruction UAL, (Word16, Word16))
+thumbDecodeDbg i = case fromJust . find (decoderMatches Thumb i) $ thumbDecoders of
+                    GeneralDecoder a b c d -> (d i, (b, c))

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, GADTs, EmptyDataDecls, FlexibleContexts, FlexibleInstances, RankNTypes #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, GADTs, EmptyDataDecls, FlexibleContexts, FlexibleInstances, RankNTypes, StandaloneDeriving, UndecidableInstances #-}
 module Architecture.ARM.Common where
 
 import Data.Bits
@@ -80,7 +80,7 @@ data GeneralInstruction a where
   Unconditional :: Instruction a Unconditional -> GeneralInstruction a
   Conditional   :: Condition -> Instruction a Conditional -> GeneralInstruction a
 
-
+deriving instance (Show (Instruction a Conditional), Show (Instruction a Unconditional)) => Show (GeneralInstruction a)
 
 generalInstruction :: r -> (Instruction a Unconditional -> r) -> (Condition -> Instruction a Conditional -> r) -> GeneralInstruction a -> r
 generalInstruction ud _ _ Undefined = ud
