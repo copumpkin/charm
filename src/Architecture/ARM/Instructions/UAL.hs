@@ -12,7 +12,7 @@ data UAL = UAL
 
 data DataOp = Imm Int32
             | Reg Register
-            | RegShiftImm Shift Int32 Register 
+            | RegShiftImm Shift Int32 Register  -- FIXME: why is this an Int32?
             | RegShiftReg Shift Register Register
             | RegShiftRRX Register
   deriving (Show, Read, Eq)
@@ -318,8 +318,8 @@ instance InstructionSet UAL where
     RFEDB  :: Bool -> Register -> Instruction UAL Unconditional
     RFEIB  :: Bool -> Register -> Instruction UAL Unconditional
 
-    BKPT   :: Word8 -> Instruction UAL Unconditional
-    PLD    :: MemOp -> Instruction UAL Unconditional
+    BKPT   :: Word32 -> Instruction UAL Unconditional
+    PLD    :: MemOp  -> Instruction UAL Unconditional
 
     SRS    :: Bool -> Register -> Word32 -> Instruction UAL Unconditional -- the register is always SP/R13
     SRSDA  :: Bool -> Register -> Word32 -> Instruction UAL Unconditional -- the register is always SP/R13

@@ -371,7 +371,7 @@ armDecoders =
  
   , decoder [ARM_EXT_V5J]   0x012fff20 0x0ffffff0 (BXJ  <$> reg 0)
  
-  , decoder [ARM_EXT_V5]    0xe1200070 0xfff000f0 (BKPT <$> ((\x y -> x `shiftL` 4 .|. y) <$> integral 8 19 <*> integral 0 3)) 
+  , decoder [ARM_EXT_V5]    0xe1200070 0xfff000f0 (BKPT <$> ((.|.) <$> ((`shiftL` 4) . integral 8 19) <*> integral 0 3)) 
   , decoder [ARM_EXT_V5]    0xfa000000 0xfe000000 (blxu <$> (Imm <$> arm_B))
   , decoder [ARM_EXT_V5]    0x012fff30 0x0ffffff0 (blxc <$> (Reg <$> reg 0))
   , decoder [ARM_EXT_V5]    0x016f0f10 0x0fff0ff0 (CLZ  <$> reg 12 <*> reg 0)
