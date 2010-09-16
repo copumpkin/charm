@@ -39,6 +39,9 @@ reg = undefined
 bool :: Int -> D Bool
 bool = undefined
 
+choose :: Int -> a -> a -> D a
+choose n t f x = if not (bool n x) then t else f
+
 multi :: D MultiRegOp
 multi = undefined
 
@@ -75,7 +78,7 @@ thumb32Decoders =
   , decoder [ARM_EXT_V6T2] 0xf3de8f00 0xffffff00 (SUBS PC LR <$> undefined) -- "subs%c\tpc, lr, #%0-7d"},
   , decoder [ARM_EXT_V6T2] 0xf3808000 0xffe0f000 (MSR   <$> undefined <*> undefined <*> (Reg <$> reg 16)) -- "msr%c\t%C, %16-19r"},
   , decoder [ARM_EXT_V6T2] 0xe8500f00 0xfff00fff (LDREX <$> reg 12 <*> (MemReg <$> reg 16 <*> pure (Imm 0) <*> pure False)) -- "ldrex%c\t%12-15r, [%16-19r]"},
-  , decoder [ARM_EXT_V6T2] 0xe8d00f4f 0xfff00fef (pure Undefined) -- "ldrex%4?hb%c\t%12-15r, [%16-19r]"},
+  , decoder [ARM_EXT_V6T2] 0xe8d00f4f 0xfff00fef (choose 4 LDREXH LDREXB <*> reg 12 <*> undefined) -- "ldrex%4?hb%c\t%12-15r, [%16-19r]"},
   , decoder [ARM_EXT_V6T2] 0xe800c000 0xffd0ffe0 (SRSDB   <$> bool 21 <*> reg 16 <*> undefined) -- "srsdb%c\t%16-19r%21'!, #%0-4d"},
   , decoder [ARM_EXT_V6T2] 0xe980c000 0xffd0ffe0 (SRS     <$> bool 21 <*> reg 16 <*> undefined) -- "srsia%c\t%16-19r%21'!, #%0-4d"},
   , decoder [ARM_EXT_V6T2] 0xfa0ff080 0xfffff0c0 (SXTH    <$> reg 8 <*> undefined) -- "sxth%c.w\t%8-11r, %0-3r%R"},
@@ -134,25 +137,25 @@ thumb32Decoders =
   , decoder [ARM_EXT_V6T2] 0xfae0f060 0xfff0f0f0 (UHSAX   <$> reg 8 <*> reg 16 <*> reg 0) -- "uhsax%c\t%8-11r, %16-19r, %0-3r"},
   , decoder [ARM_EXT_V6T2] 0xfb00f000 0xfff0f0f0 (MUL     <$> reg 8 <*> reg 16 <*> reg 0) -- "mul%c.w\t%8-11r, %16-19r, %0-3r"},
   , decoder [ARM_EXT_V6T2] 0xfb70f000 0xfff0f0f0 (USAD8   <$> reg 8 <*> reg 16 <*> reg 0) -- "usad8%c\t%8-11r, %16-19r, %0-3r"},
-  , decoder [ARM_EXT_V6T2] 0xfa00f000 0xffe0f0f0 (lsl <$> bool 20 <*> reg 8 <*> (RegShiftReg S_LSL <$> reg 16 <*> reg 0)) -- "lsl%20's%c.w\t%8-11R, %16-19R, %0-3R"},
-  , decoder [ARM_EXT_V6T2] 0xfa20f000 0xffe0f0f0 (lsr <$> bool 20 <*> reg 8 <*> (RegShiftReg S_LSR <$> reg 16 <*> reg 0)) -- "lsr%20's%c.w\t%8-11R, %16-19R, %0-3R"},
-  , decoder [ARM_EXT_V6T2] 0xfa40f000 0xffe0f0f0 (asr <$> bool 20 <*> reg 8 <*> (RegShiftReg S_ASR <$> reg 16 <*> reg 0)) -- "asr%20's%c.w\t%8-11R, %16-19R, %0-3R"},
-  , decoder [ARM_EXT_V6T2] 0xfa60f000 0xffe0f0f0 (ror <$> bool 20 <*> reg 8 <*> (RegShiftReg S_ROR <$> reg 16 <*> reg 0)) -- "ror%20's%c.w\t%8-11r, %16-19r, %0-3r"},
-  , decoder [ARM_EXT_V6T2] 0xe8c00f40 0xfff00fe0 (pure Undefined) -- "strex%4?hb%c\t%0-3r, %12-15r, [%16-19r]"},
+  , decoder [ARM_EXT_V6T2] 0xfa00f000 0xffe0f0f0 (lsl     <$> bool 20 <*> reg 8 <*> (RegShiftReg S_LSL <$> reg 16 <*> reg 0)) -- "lsl%20's%c.w\t%8-11R, %16-19R, %0-3R"},
+  , decoder [ARM_EXT_V6T2] 0xfa20f000 0xffe0f0f0 (lsr     <$> bool 20 <*> reg 8 <*> (RegShiftReg S_LSR <$> reg 16 <*> reg 0)) -- "lsr%20's%c.w\t%8-11R, %16-19R, %0-3R"},
+  , decoder [ARM_EXT_V6T2] 0xfa40f000 0xffe0f0f0 (asr     <$> bool 20 <*> reg 8 <*> (RegShiftReg S_ASR <$> reg 16 <*> reg 0)) -- "asr%20's%c.w\t%8-11R, %16-19R, %0-3R"},
+  , decoder [ARM_EXT_V6T2] 0xfa60f000 0xffe0f0f0 (ror     <$> bool 20 <*> reg 8 <*> (RegShiftReg S_ROR <$> reg 16 <*> reg 0)) -- "ror%20's%c.w\t%8-11r, %16-19r, %0-3r"},
+  , decoder [ARM_EXT_V6T2] 0xe8c00f40 0xfff00fe0 (choose 4 STREXH STREXB <*> reg 0 <*> reg 12 <*> undefined) -- "strex%4?hb%c\t%0-3r, %12-15r, [%16-19r]"},
   , decoder [ARM_EXT_V6T2] 0xf3200000 0xfff0f0e0 (SSAT16  <$> reg 8 <*> undefined <*> reg 16) -- "ssat16%c\t%8-11r, #%0-4d, %16-19r"},
   , decoder [ARM_EXT_V6T2] 0xf3a00000 0xfff0f0e0 (USAT16  <$> reg 8 <*> undefined <*> reg 16) -- "usat16%c\t%8-11r, #%0-4d, %16-19r"},
-  , decoder [ARM_EXT_V6T2] 0xfb20f000 0xfff0f0e0 (pure Undefined) -- "smuad%4'x%c\t%8-11r, %16-19r, %0-3r"},
-  , decoder [ARM_EXT_V6T2] 0xfb30f000 0xfff0f0e0 (pure Undefined) -- "smulw%4?tb%c\t%8-11r, %16-19r, %0-3r"},
-  , decoder [ARM_EXT_V6T2] 0xfb40f000 0xfff0f0e0 (pure Undefined) -- "smusd%4'x%c\t%8-11r, %16-19r, %0-3r"},
-  , decoder [ARM_EXT_V6T2] 0xfb50f000 0xfff0f0e0 (pure Undefined) -- "smmul%4'r%c\t%8-11r, %16-19r, %0-3r"},
-  , decoder [ARM_EXT_V6T2] 0xfa00f080 0xfff0f0c0 (pure Undefined) -- "sxtah%c\t%8-11r, %16-19r, %0-3r%R"},
-  , decoder [ARM_EXT_V6T2] 0xfa10f080 0xfff0f0c0 (pure Undefined) -- "uxtah%c\t%8-11r, %16-19r, %0-3r%R"},
-  , decoder [ARM_EXT_V6T2] 0xfa20f080 0xfff0f0c0 (pure Undefined) -- "sxtab16%c\t%8-11r, %16-19r, %0-3r%R"},
-  , decoder [ARM_EXT_V6T2] 0xfa30f080 0xfff0f0c0 (pure Undefined) -- "uxtab16%c\t%8-11r, %16-19r, %0-3r%R"},
-  , decoder [ARM_EXT_V6T2] 0xfa40f080 0xfff0f0c0 (pure Undefined) -- "sxtab%c\t%8-11r, %16-19r, %0-3r%R"},
-  , decoder [ARM_EXT_V6T2] 0xfa50f080 0xfff0f0c0 (pure Undefined) -- "uxtab%c\t%8-11r, %16-19r, %0-3r%R"},
+  , decoder [ARM_EXT_V6T2] 0xfb20f000 0xfff0f0e0 (smuad   <$> bool 4 <*> reg 8 <*> reg 16 <*> reg 0) -- "smuad%4'x%c\t%8-11r, %16-19r, %0-3r"},
+  , decoder [ARM_EXT_V6T2] 0xfb30f000 0xfff0f0e0 (choose 4 SMULWT SMULWB <*> reg 8 <*> reg 16 <*> reg 0) -- "smulw%4?tb%c\t%8-11r, %16-19r, %0-3r"},
+  , decoder [ARM_EXT_V6T2] 0xfb40f000 0xfff0f0e0 (smusd   <$> bool 4 <*> reg 8 <*> reg 16 <*> reg 0) -- "smusd%4'x%c\t%8-11r, %16-19r, %0-3r"},
+  , decoder [ARM_EXT_V6T2] 0xfb50f000 0xfff0f0e0 (smmul   <$> bool 4 <*> reg 8 <*> reg 16 <*> reg 0) -- "smmul%4'r%c\t%8-11r, %16-19r, %0-3r"},
+  , decoder [ARM_EXT_V6T2] 0xfa00f080 0xfff0f0c0 (SXTAH   <$> reg 8 <*> reg 16 <*> undefined) -- "sxtah%c\t%8-11r, %16-19r, %0-3r%R"},
+  , decoder [ARM_EXT_V6T2] 0xfa10f080 0xfff0f0c0 (UXTAH   <$> reg 8 <*> reg 16 <*> undefined) -- "uxtah%c\t%8-11r, %16-19r, %0-3r%R"},
+  , decoder [ARM_EXT_V6T2] 0xfa20f080 0xfff0f0c0 (SXTAB16 <$> reg 8 <*> reg 16 <*> undefined) -- "sxtab16%c\t%8-11r, %16-19r, %0-3r%R"},
+  , decoder [ARM_EXT_V6T2] 0xfa30f080 0xfff0f0c0 (UXTAB16 <$> reg 8 <*> reg 16 <*> undefined) -- "uxtab16%c\t%8-11r, %16-19r, %0-3r%R"},
+  , decoder [ARM_EXT_V6T2] 0xfa40f080 0xfff0f0c0 (SXTAB   <$> reg 8 <*> reg 16 <*> undefined) -- "sxtab%c\t%8-11r, %16-19r, %0-3r%R"},
+  , decoder [ARM_EXT_V6T2] 0xfa50f080 0xfff0f0c0 (UXTAB   <$> reg 8 <*> reg 16 <*> undefined) -- "uxtab%c\t%8-11r, %16-19r, %0-3r%R"},
   , decoder [ARM_EXT_V6T2] 0xfb10f000 0xfff0f0c0 (pure Undefined) -- "smul%5?tb%4?tb%c\t%8-11r, %16-19r, %0-3r"},
-  , decoder [ARM_EXT_V6T2] 0xf36f0000 0xffff8020 (pure Undefined) -- "bfc%c\t%8-11r, %E"},
+  , decoder [ARM_EXT_V6T2] 0xf36f0000 0xffff8020 (BFC <$> reg 8 <*> undefined) -- "bfc%c\t%8-11r, %E"},
   , decoder [ARM_EXT_V6T2] 0xea100f00 0xfff08f00 (TST <$> reg 16 <*> undefined) -- "tst%c.w\t%16-19r, %S"},
   , decoder [ARM_EXT_V6T2] 0xea900f00 0xfff08f00 (TEQ <$> reg 16 <*> undefined) -- "teq%c\t%16-19r, %S"},
   , decoder [ARM_EXT_V6T2] 0xeb100f00 0xfff08f00 (CMN <$> reg 16 <*> undefined) -- "cmn%c.w\t%16-19r, %S"},
@@ -163,10 +166,10 @@ thumb32Decoders =
   , decoder [ARM_EXT_V6T2] 0xf1b00f00 0xfbf08f00 (CMP <$> reg 16 <*> undefined) -- "cmp%c.w\t%16-19r, %M"},
   , decoder [ARM_EXT_V6T2] 0xea4f0000 0xffef8000 (mov <$> bool 20 <*> reg 8 <*> undefined) -- "mov%20's%c.w\t%8-11r, %S"},
   , decoder [ARM_EXT_V6T2] 0xea6f0000 0xffef8000 (mvn <$> bool 20 <*> reg 8 <*> undefined) -- "mvn%20's%c.w\t%8-11r, %S"},
-  , decoder [ARM_EXT_V6T2] 0xe8c00070 0xfff000f0 (pure Undefined) -- "strexd%c\t%0-3r, %12-15r, %8-11r, [%16-19r]"},
+  , decoder [ARM_EXT_V6T2] 0xe8c00070 0xfff000f0 (STREXD <$> reg 0 <*> reg 12 <*> reg 8 <*> undefined) -- "strexd%c\t%0-3r, %12-15r, %8-11r, [%16-19r]"},
   , decoder [ARM_EXT_V6T2] 0xfb000000 0xfff000f0 (MLA <$> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- "mla%c\t%8-11r, %16-19r, %0-3r, %12-15r"},
   , decoder [ARM_EXT_V6T2] 0xfb000010 0xfff000f0 (MLS <$> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- "mls%c\t%8-11r, %16-19r, %0-3r, %12-15r"},
-  , decoder [ARM_EXT_V6T2] 0xfb700000 0xfff000f0 (pure Undefined) -- "usada8%c\t%8-11R, %16-19R, %0-3R, %12-15R"},
+  , decoder [ARM_EXT_V6T2] 0xfb700000 0xfff000f0 (USADA8 <$> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- "usada8%c\t%8-11R, %16-19R, %0-3R, %12-15R"},
   , decoder [ARM_EXT_V6T2] 0xfb800000 0xfff000f0 (SMULL  <$> reg 12 <*> reg 8 <*> reg 16 <*> reg 0) -- "smull%c\t%12-15R, %8-11R, %16-19R, %0-3R"},
   , decoder [ARM_EXT_V6T2] 0xfba00000 0xfff000f0 (UMULL  <$> reg 12 <*> reg 8 <*> reg 16 <*> reg 0) -- "umull%c\t%12-15R, %8-11R, %16-19R, %0-3R"},
   , decoder [ARM_EXT_V6T2] 0xfbc00000 0xfff000f0 (SMLAL  <$> reg 12 <*> reg 8 <*> reg 16 <*> reg 0) -- "smlal%c\t%12-15R, %8-11R, %16-19R, %0-3R"},
@@ -178,7 +181,7 @@ thumb32Decoders =
   , decoder [ARM_EXT_V6T2] 0xf06f0000 0xfbef8000 (mvn    <$> bool 20 <*> reg 8 <*> undefined) -- "mvn%20's%c.w\t%8-11r, %M"},
   , decoder [ARM_EXT_V6T2] 0xf810f000 0xff70f000 (PLD    <$> undefined) -- "pld%c\t%a"},
   , decoder [ARM_EXT_V6T2] 0xfb200000 0xfff000e0 (smlad  <$> bool 4 <*> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- "smlad%4'x%c\t%8-11R, %16-19R, %0-3R, %12-15R"},
-  , decoder [ARM_EXT_V6T2] 0xfb300000 0xfff000e0 (pure Undefined) -- <*> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- "smlaw%4?tb%c\t%8-11R, %16-19R, %0-3R, %12-15R"},
+  , decoder [ARM_EXT_V6T2] 0xfb300000 0xfff000e0 (choose 4 SMLAWT SMLAWB <*> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- <*> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- "smlaw%4?tb%c\t%8-11R, %16-19R, %0-3R, %12-15R"},
   , decoder [ARM_EXT_V6T2] 0xfb400000 0xfff000e0 (smlsd  <$> bool 4 <*> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- "smlsd%4'x%c\t%8-11R, %16-19R, %0-3R, %12-15R"},
   , decoder [ARM_EXT_V6T2] 0xfb500000 0xfff000e0 (smmla  <$> bool 4 <*> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- "smmla%4'r%c\t%8-11R, %16-19R, %0-3R, %12-15R"},
   , decoder [ARM_EXT_V6T2] 0xfb600000 0xfff000e0 (smmls  <$> bool 4 <*> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- "smmls%4'r%c\t%8-11R, %16-19R, %0-3R, %12-15R"},
@@ -198,7 +201,7 @@ thumb32Decoders =
   , decoder [ARM_EXT_V6T2] 0xf2000000 0xfbf08000 (pure Undefined) -- "addw%c\t%8-11r, %16-19r, %I"},
   , decoder [ARM_EXT_V6T2] 0xf2400000 0xfbf08000 (pure Undefined) -- "movw%c\t%8-11r, %J"},
   , decoder [ARM_EXT_V6T2] 0xf2a00000 0xfbf08000 (pure Undefined) -- "subw%c\t%8-11r, %16-19r, %I"},
-  , decoder [ARM_EXT_V6T2] 0xf2c00000 0xfbf08000 (pure Undefined) -- "movt%c\t%8-11r, %J"},
+  , decoder [ARM_EXT_V6T2] 0xf2c00000 0xfbf08000 (MOVT  <$> reg 8 <*> undefined) -- "movt%c\t%8-11r, %J"},
   , decoder [ARM_EXT_V6T2] 0xea000000 0xffe08000 (and   <$> bool 20 <*> reg 8 <*> reg 16 <*> undefined) -- "and%20's%c.w\t%8-11r, %16-19r, %S"},
   , decoder [ARM_EXT_V6T2] 0xea200000 0xffe08000 (bic   <$> bool 20 <*> reg 8 <*> reg 16 <*> undefined) -- "bic%20's%c.w\t%8-11r, %16-19r, %S"},
   , decoder [ARM_EXT_V6T2] 0xea400000 0xffe08000 (orr   <$> bool 20 <*> reg 8 <*> reg 16 <*> undefined) -- "orr%20's%c.w\t%8-11r, %16-19r, %S"},
@@ -235,12 +238,12 @@ thumb32Decoders =
 
   , decoder [ARM_EXT_V6T2] 0xf3c08000 0xfbc0d000 (pure Undefined) -- "(pure Undefined) (bcc, cond=0xF)"},
   , decoder [ARM_EXT_V6T2] 0xf3808000 0xfbc0d000 (pure Undefined) -- "(pure Undefined) (bcc, cond=0xE)"},
-  , decoder [ARM_EXT_V6T2] 0xf0008000 0xf800d000 (pure Undefined) -- "b%22-25c.w\t%b%X"},
-  , decoder [ARM_EXT_V6T2] 0xf0009000 0xf800d000 (pure Undefined) -- "b%c.w\t%B%x"},
+  , decoder [ARM_EXT_V6T2] 0xf0008000 0xf800d000 (B     <$> undefined) -- "b%22-25c.w\t%b%X"},
+  , decoder [ARM_EXT_V6T2] 0xf0009000 0xf800d000 (B     <$> undefined) -- "b%c.w\t%B%x"},
 
 
-  , decoder [ARM_EXT_V4T]  0xf000c000 0xf800d000 (pure Undefined) -- "blx%c\t%B%x"},
-  , decoder [ARM_EXT_V4T]  0xf000d000 0xf800d000 (pure Undefined) -- "bl%c\t%B%x"},
+  , decoder [ARM_EXT_V4T]  0xf000c000 0xf800d000 (blxu  <$> undefined) -- "blx%c\t%B%x"},
+  , decoder [ARM_EXT_V4T]  0xf000d000 0xf800d000 (BL    <$> undefined) -- "bl%c\t%B%x"},
 
   , decoder [ARM_EXT_V1]   0x00000000 0x00000000 (pure Undefined)
   ]
