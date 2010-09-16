@@ -238,7 +238,7 @@ instance InstructionSet UAL where
     LDR    :: Register -> MemOp -> Instruction UAL Conditional
     LDRB   :: Register -> MemOp -> Instruction UAL Conditional
     LDRH   :: Register -> MemOp -> Instruction UAL Conditional
-    LDRD   :: Register -> MemOp -> Instruction UAL Conditional
+    LDRD   :: Register -> Register -> MemOp -> Instruction UAL Conditional
     LDRBT  :: Register -> MemOp -> Instruction UAL Conditional
     LDRHT  :: Register -> MemOp -> Instruction UAL Conditional
     LDRT   :: Register -> MemOp -> Instruction UAL Conditional
@@ -250,7 +250,7 @@ instance InstructionSet UAL where
     STR    :: Register -> MemOp -> Instruction UAL Conditional
     STRB   :: Register -> MemOp -> Instruction UAL Conditional
     STRH   :: Register -> MemOp -> Instruction UAL Conditional
-    STRD   :: Register -> MemOp -> Instruction UAL Conditional
+    STRD   :: Register -> Register -> MemOp -> Instruction UAL Conditional
     STRBT  :: Register -> MemOp -> Instruction UAL Conditional
     STRHT  :: Register -> MemOp -> Instruction UAL Conditional
     STRT   :: Register -> MemOp -> Instruction UAL Conditional
@@ -333,6 +333,16 @@ instance InstructionSet UAL where
 
     IT     :: ITSpecifier -> Instruction UAL Unconditional
 
+    SDIV   :: Register -> Register -> Register -> Instruction UAL Unconditional
+    UDIV   :: Register -> Register -> Register -> Instruction UAL Unconditional
+
+    TBB    :: MemOp -> Instruction UAL Unconditional
+    TBH    :: MemOp -> Instruction UAL Unconditional
+
+    ORN    :: Register -> Register -> DataOp -> Instruction UAL Unconditional
+    ORNS   :: Register -> Register -> DataOp -> Instruction UAL Unconditional
+
+
 deriving instance Show (Instruction UAL c)
 
 -- Handy psuedo-accessors to use the flexible blx
@@ -357,6 +367,7 @@ add = cond ADD ADDS
 adc = cond ADC ADCS
 sbc = cond SBC SBCS
 rsc = cond RSC RSCS
+orn = cond ORN ORNS
 
 smuad  = cond SMUAD SMUADX
 smusd  = cond SMUSD SMUSDX
@@ -400,7 +411,7 @@ ldr Halfword   True   False = LDRHT
 ldr Halfword   True   True  = LDRSHT
 ldr Word       False  False = LDR
 ldr Word       True   False = LDRT
-ldr Doubleword False  False = LDRD
+-- ldr Doubleword False  False = LDRD
 ldr _ _ _ = error "invalid combination of LDR flags"
 
 str :: Width -> Bool -> Register -> MemOp -> Instruction UAL Conditional
@@ -410,7 +421,7 @@ str Halfword   False  = STRH
 str Halfword   True   = STRHT
 str Word       False  = STR
 str Word       True   = STRT
-str Doubleword False  = STRD
+-- str Doubleword False  = STRD
 str _ _ = error "invalid combination of STR flags"
 
 ldm Decrement After  = LDMDA

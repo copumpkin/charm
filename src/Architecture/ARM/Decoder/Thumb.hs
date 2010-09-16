@@ -1,10 +1,12 @@
 {-# Language MultiParamTypeClasses, TypeFamilies, FlexibleInstances, FlexibleContexts #-}
-module Architecture.ARM.Decoder.Thumb where
+module Architecture.ARM.Decoder.Thumb (Thumb, thumbDecode, thumbDecodeDbg) where
 
 import Prelude hiding (and)
 
 import Architecture.ARM.Common
 import Architecture.ARM.Instructions.UAL
+
+import Architecture.ARM.Decoder.Thumb32
 
 import Data.Maybe
 import Data.List hiding (and)
@@ -12,10 +14,12 @@ import Data.Int
 import Data.Word hiding (Word)
 import Data.Bits hiding (bit, shift)
 
-import Text.Printf
+import Text.Show
 
 import Control.Monad
 import Control.Applicative
+
+
 
 data Thumb = Thumb
 type instance Word Thumb = Word16
@@ -23,16 +27,30 @@ type instance Word Thumb = Word16
 -- Basically an iteratee
 data ThumbContinuation a = Done a | Word16 (Word16 -> ThumbContinuation a)
 
+instance Show a => Show (ThumbContinuation a) where
+  showsPrec d (Done x) = showParen (d > 10) $ showString "Done " . showsPrec 11 x
+  showsPrec d (Word16 f) = showParen (d > 10) $ showString "Word16 <function>"
+
 
 instance Decoder Thumb (Instruction UAL Conditional) where
-  type Target Thumb (Instruction UAL Conditional) = GeneralInstruction UAL
+  type Target Thumb (Instruction UAL Conditional) = ThumbContinuation (GeneralInstruction UAL)
 
-  decoder s v m d = GeneralDecoder s v m (Conditional AL <$> d) 
+  decoder s v m d = GeneralDecoder s v m (Done . Conditional AL <$> d) 
 
 instance Decoder Thumb (Instruction UAL Unconditional) where
-  type Target Thumb (Instruction UAL Unconditional) = GeneralInstruction UAL
+  type Target Thumb (Instruction UAL Unconditional) = ThumbContinuation (GeneralInstruction UAL)
   
-  decoder s v m d = GeneralDecoder s v m (Unconditional <$> d)
+  decoder s v m d = GeneralDecoder s v m (Done . Unconditional <$> d)
+
+instance Decoder Thumb (GeneralInstruction a) where
+  type Target Thumb (GeneralInstruction a) = ThumbContinuation (GeneralInstruction a)
+
+  decoder s v m d = GeneralDecoder s v m (Done . d)
+
+instance Decoder Thumb (ThumbContinuation a) where
+  type Target Thumb (ThumbContinuation a) = ThumbContinuation a
+
+  decoder s v m d = GeneralDecoder s v m d
 
 
 type D a = Word16 -> a
@@ -114,11 +132,17 @@ ifthen =
        _ -> return Nil -- FIXME: Eww
 
 
-thumbDecoders :: [GeneralDecoder Thumb (GeneralInstruction UAL)]
+catWord16 :: Word16 -> Word16 -> Word32
+catWord16 x y = (fromIntegral x `shiftL` 16) .|. (fromIntegral y)
+
+thumb32 :: D (ThumbContinuation (GeneralInstruction UAL))
+thumb32 x = Word16 (Done . thumb32Decode . catWord16 x)
+
+thumbDecoders :: [GeneralDecoder Thumb (ThumbContinuation (GeneralInstruction UAL))]
 thumbDecoders = 
-  [ decoder []             0xe800 0xf800 (pure (error "32-bit thumb" :: GeneralInstruction UAL))
-  , decoder []             0xf000 0xf800 (pure (error "32-bit thumb" :: GeneralInstruction UAL))
-  , decoder []             0xf800 0xf800 (pure (error "32-bit thumb" :: GeneralInstruction UAL))
+  [ decoder []             0xe800 0xf800 thumb32
+  , decoder []             0xf000 0xf800 thumb32
+  , decoder []             0xf800 0xf800 thumb32
   
   , decoder [ARM_EXT_V6K]  0xbf00 0xffff (pure NOP)
   , decoder [ARM_EXT_V6K]  0xbf10 0xffff (pure YIELD)
@@ -128,7 +152,7 @@ thumbDecoders =
   
   , decoder [ARM_EXT_V6T2] 0xb900 0xfd00 (CBNZ   <$> reg 0 <*> branch) -- "cbnz\t%0-2r, %b%X"},
   , decoder [ARM_EXT_V6T2] 0xb100 0xfd00 (CBZ    <$> reg 0 <*> branch) -- "cbz\t%0-2r, %b%X"},
-  , decoder [ARM_EXT_V6T2] 0xbf00 0xff00 (IT     <$> ifthen) -- "it%I%X"},
+  , decoder [ARM_EXT_V6T2] 0xbf00 0xff00 (IT     <$> ifthen) -- FIXME: use the continuation here, too  -- "it%I%X"},
   
   , decoder [ARM_EXT_V6]   0xb660 0xfff8 (CPSIE  <$> bool 2 <*> bool 1 <*> bool 0 <*> pure Nothing) -- "cpsie\t%2'a%1'i%0'f%X"},
   , decoder [ARM_EXT_V6]   0xb670 0xfff8 (CPSID  <$> bool 2 <*> bool 1 <*> bool 0 <*> pure Nothing) -- "cpsid\t%2'a%1'i%0'f%X"},
@@ -228,9 +252,9 @@ thumbDecoders =
   ]
 
 
-thumbDecode :: Word16 -> GeneralInstruction UAL
-thumbDecode i = fromMaybe Undefined . fmap (decode Thumb i) . find (decoderMatches Thumb i) $ thumbDecoders
+thumbDecode :: Word16 -> ThumbContinuation (GeneralInstruction UAL)
+thumbDecode i = fromMaybe (Done Undefined) . fmap (decode Thumb i) . find (decoderMatches Thumb i) $ thumbDecoders
 
-thumbDecodeDbg :: Word16 -> (GeneralInstruction UAL, (Word16, Word16))
+thumbDecodeDbg :: Word16 -> (ThumbContinuation (GeneralInstruction UAL), (Word16, Word16))
 thumbDecodeDbg i = case fromJust . find (decoderMatches Thumb i) $ thumbDecoders of
                     GeneralDecoder a b c d -> (d i, (b, c))

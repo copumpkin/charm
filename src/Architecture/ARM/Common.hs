@@ -118,7 +118,4 @@ class Decoder e i where
   
   decoder :: [Subarch] -> Word e -> Word e -> (Word e -> i) -> GeneralDecoder e (Target e i)
 
-instance Decoder a (GeneralInstruction i) where
-  type Target a (GeneralInstruction i) = GeneralInstruction i
 
-  decoder s v m d = GeneralDecoder s v m d

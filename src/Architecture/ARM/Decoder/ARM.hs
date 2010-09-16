@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, EmptyDataDecls #-}
-module Architecture.ARM.Decoder.ARM where
+module Architecture.ARM.Decoder.ARM (ARM, armDecode, armDecodeDbg) where
 
 import Prelude hiding (and)
 
@@ -34,6 +34,10 @@ instance Decoder ARM (Instruction UAL Unconditional) where
   
   decoder s v m d = GeneralDecoder s v m (Unconditional <$> d)
 
+instance Decoder ARM (GeneralInstruction a) where
+  type Target ARM (GeneralInstruction a) = GeneralInstruction a
+
+  decoder s v m d = GeneralDecoder s v m d
 
 
 bitRange :: (Integral a, Bits a, Integral b) => Int -> Int -> a -> b
@@ -376,8 +380,8 @@ armDecoders =
   , decoder [ARM_EXT_V5]    0x012fff30 0x0ffffff0 (blxc <$> (Reg <$> reg 0))
   , decoder [ARM_EXT_V5]    0x016f0f10 0x0fff0ff0 (CLZ  <$> reg 12 <*> reg 0)
   
-  , decoder [ARM_EXT_V5E]   0x000000d0 0x0e1000f0 (LDRD <$> reg 12 <*> arm_s)
-  , decoder [ARM_EXT_V5E]   0x000000f0 0x0e1000f0 (STRD <$> reg 12 <*> arm_s)
+  , decoder [ARM_EXT_V5E]   0x000000d0 0x0e1000f0 (LDRD <$> reg 12 <*> (succ <$> reg 12) <*> arm_s)
+  , decoder [ARM_EXT_V5E]   0x000000f0 0x0e1000f0 (STRD <$> reg 12 <*> (succ <$> reg 12) <*> arm_s)
   , decoder [ARM_EXT_V5E]   0xf450f000 0xfc70f000 (PLD <$> arm_a)
   
   , decoder [ARM_EXT_V5ExP] 0x01000080 0x0ff000f0 (reg16_reg0_reg8_reg12 $ SMLABB)
