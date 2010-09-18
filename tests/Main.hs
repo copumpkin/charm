@@ -37,23 +37,36 @@ ualMatches off (Conditional cond (BL op)) s = map toLower (showGeneralInstructio
 ualMatches off (Unconditional (BLX (Imm op))) s = map toLower (showGeneralInstruction (Unconditional (BLX (Imm $ op + (fromIntegral off))))) @?= s
 ualMatches off x s = map toLower (showGeneralInstruction x) @?= s
 
-testDecoder16 f s a = 
-  do rs <- fmap (take 1000 . randoms) getStdGen
+testDecoderThumb = 
+  do let f = thumbDecode
+     rs <- fmap (take 1000 . randoms) getStdGen
      let ws = map fromIntegral (rs :: [Int]) 
-     insns <- disassemble16 "/Users/pumpkin/summon-arm-toolchain/sources/src/binutils/objdump" (["-b", "binary", "-m", "arm", "-M", "force-thumb"] ++ a) ws
-     let ours = map (\(_, x) -> either f (f . fst) x) insns
-     let tests = zipWith4 (\off w o u -> testCase (printf "0x%04x: 0x%04x %s" off w u) (ualMatches off o u)) [0,2..] (map (either id fst . snd) insns) ours (map fst insns)
-     return $ testGroup (s ++ " decoder") tests
+     insns <- disassemble16 "/Users/pumpkin/summon-arm-toolchain/sources/src/binutils/objdump" ["-b", "binary", "-m", "arm", "-M", "force-thumb"] ws
+     let ours = map (\(_, x) -> either i16 i32 x) insns
+     let tests = zipWith4 (\off w o u -> testCase (printf "0x%04x: %s %s" off w u) (ualMatches off o u)) [0,2..] (map (either (printf "%04x\t\t" :: Word16 -> String) (uncurry (printf "%04x %04x\t")) . snd) insns) ours (map fst insns)
+     return $ testGroup ("Thumb decoder") tests
+  where i16 :: Word16 -> GeneralInstruction UAL
+        i16 i = case thumbDecode i of
+                  Done x -> x
+                  Word16 _ -> error "decoded 16-bit instruction to larger instruction"
 
-testDecoder d f s a = 
-  do rs <- fmap (take 100 . randoms) getStdGen
+        i32 :: (Word16, Word16) -> GeneralInstruction UAL
+        i32 (i0, i1) = case thumbDecode i0 of
+                         Done x -> error $ "decoded 32-bit instruction to smaller instruction (" ++ show x ++ ")"
+                         Word16 f -> case f i1 of
+                                       Done x -> x
+                                       Word16 _ -> error "decoded 32-bit instruction to larger instruction"
+
+testDecoderARM d f s a = 
+  do let f = armDecode
+     rs <- fmap (take 100 . randoms) getStdGen
      let ws = map fromIntegral (rs :: [Int]) 
-     insns <- disassemble "/Users/pumpkin/summon-arm-toolchain/sources/src/binutils/objdump" (["-b", "binary", "-m", "arm"] ++ a) ws
+     insns <- disassemble "/Users/pumpkin/summon-arm-toolchain/sources/src/binutils/objdump" ["-b", "binary", "-m", "arm"] ws
      let ours = map f ws
      let tests = zipWith4 (\off w o u -> testCase (printf "0x%08x: 0x%08x %s" off w u) (ualMatches off o u)) [0,4..] ws ours insns
-     return $ testGroup (s ++ " decoder") tests
+     return $ testGroup ("ARM decoder") tests
 
-main = defaultMain =<< sequence [{-testDecoder armDecode "ARM" [],-} testDecoder16 thumbDecode "Thumb" ["-M", "force-thumb"]]
+main = defaultMain =<< sequence [{-testDecoderARM-} testDecoderThumb]
 
 {-
 Thumb issues

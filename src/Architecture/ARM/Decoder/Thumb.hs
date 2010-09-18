@@ -1,5 +1,5 @@
-{-# Language MultiParamTypeClasses, TypeFamilies, FlexibleInstances, FlexibleContexts #-}
-module Architecture.ARM.Decoder.Thumb (Thumb, thumbDecode, thumbDecodeDbg) where
+{-# Language PackageImports, MultiParamTypeClasses, TypeFamilies, FlexibleInstances, FlexibleContexts, ImplicitParams, TypeSynonymInstances #-}
+module Architecture.ARM.Decoder.Thumb (Thumb, thumbDecode, thumbDecodeDbg, ThumbContinuation(..)) where
 
 import Prelude hiding (and)
 
@@ -19,18 +19,13 @@ import Text.Show
 import Control.Monad
 import Control.Applicative
 
-
+import Architecture.ARM.Decoder.Iteratee
 
 data Thumb = Thumb
 type instance Word Thumb = Word16
 
--- Basically an iteratee
-data ThumbContinuation a = Done a | Word16 (Word16 -> ThumbContinuation a)
-
-instance Show a => Show (ThumbContinuation a) where
-  showsPrec d (Done x) = showParen (d > 10) $ showString "Done " . showsPrec 11 x
-  showsPrec d (Word16 f) = showParen (d > 10) $ showString "Word16 <function>"
-
+-- Basically an iteratee, or the free monad of (Word16 ->)
+type ThumbContinuation = Iteratee Word16
 
 instance Decoder Thumb (Instruction UAL Conditional) where
   type Target Thumb (Instruction UAL Conditional) = ThumbContinuation (GeneralInstruction UAL)
@@ -110,33 +105,42 @@ shift =
 condition :: D Condition
 condition = toEnum . integral 8 11
 
+
 ifthen :: D ITSpecifier
 ifthen = 
   do bs <- mapM bool [4,3..0]
      case bs of
-       [fc, True, False, False, False] -> return Nil
-       [fc, m3  , True , False, False] | m3 == fc -> return T
-       [fc, m3  , True , False, False] | m3 == fc -> return E
-       [fc, m3  , m2   , True , False] | m3 == fc && m2 == fc -> return TT
-       [fc, m3  , m2   , True , False] | m3 /= fc && m2 == fc -> return ET
-       [fc, m3  , m2   , True , False] | m3 == fc && m2 /= fc -> return TE
-       [fc, m3  , m2   , True , False] | m3 /= fc && m2 /= fc -> return EE
-       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 == fc && m1 == fc -> return TTT
-       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 == fc && m1 == fc -> return ETT
-       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 /= fc && m1 == fc -> return TET
-       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 /= fc && m1 == fc -> return EET
-       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 == fc && m1 /= fc -> return TTE
-       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 == fc && m1 /= fc -> return ETE
-       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 /= fc && m1 /= fc -> return TEE
-       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 /= fc && m1 /= fc -> return EEE
-       _ -> return Nil -- FIXME: Eww
+       [fc, True, False, False, False] -> return Empty
+       [fc, m3  , True , False, False] | m3 == fc -> return $ Then Empty
+       [fc, m3  , True , False, False] | m3 == fc -> return $ Else Empty
+       [fc, m3  , m2   , True , False] | m3 == fc && m2 == fc -> return $ Then (Then Empty)
+       [fc, m3  , m2   , True , False] | m3 /= fc && m2 == fc -> return $ Else (Then Empty)
+       [fc, m3  , m2   , True , False] | m3 == fc && m2 /= fc -> return $ Then (Else Empty)
+       [fc, m3  , m2   , True , False] | m3 /= fc && m2 /= fc -> return $ Else (Else Empty)
+       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 == fc && m1 == fc -> return $ Then (Then (Then Empty))
+       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 == fc && m1 == fc -> return $ Else (Then (Then Empty))
+       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 /= fc && m1 == fc -> return $ Then (Else (Then Empty))
+       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 /= fc && m1 == fc -> return $ Else (Else (Then Empty))
+       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 == fc && m1 /= fc -> return $ Then (Then (Else Empty))
+       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 == fc && m1 /= fc -> return $ Else (Then (Else Empty))
+       [fc, m3  , m2   , m1   , True ] | m3 == fc && m2 /= fc && m1 /= fc -> return $ Then (Else (Else Empty))
+       [fc, m3  , m2   , m1   , True ] | m3 /= fc && m2 /= fc && m1 /= fc -> return $ Else (Else (Else Empty))
+       _ -> return Empty -- FIXME: Eww
 
 
 catWord16 :: Word16 -> Word16 -> Word32
 catWord16 x y = (fromIntegral x `shiftL` 16) .|. (fromIntegral y)
 
 thumb32 :: D (ThumbContinuation (GeneralInstruction UAL))
-thumb32 x = Word16 (Done . thumb32Decode . catWord16 x)
+thumb32 x = More (Done . thumb32Decode . catWord16 x)
+
+it :: D (ThumbContinuation [GeneralInstruction UAL])
+it = fromIteratee $
+  do specifier <- toIteratee (pure . ifthen)
+     baseCond  <- toIteratee (pure . toEnum . integral 4 7)
+     insns <- mapM (\c -> undefined c <$> toIteratee thumbDecode) (itList baseCond specifier)
+     return $ Unconditional (IT specifier baseCond) : insns
+
 
 thumbDecoders :: [GeneralDecoder Thumb (ThumbContinuation (GeneralInstruction UAL))]
 thumbDecoders = 
@@ -152,7 +156,7 @@ thumbDecoders =
   
   , decoder [ARM_EXT_V6T2] 0xb900 0xfd00 (CBNZ   <$> reg 0 <*> branch) -- "cbnz\t%0-2r, %b%X"},
   , decoder [ARM_EXT_V6T2] 0xb100 0xfd00 (CBZ    <$> reg 0 <*> branch) -- "cbz\t%0-2r, %b%X"},
-  , decoder [ARM_EXT_V6T2] 0xbf00 0xff00 (IT     <$> ifthen) -- FIXME: use the continuation here, too  -- "it%I%X"},
+  , decoder [ARM_EXT_V6T2] 0xbf00 0xff00 (IT     <$> ifthen <*> toEnum . integral 4 7) -- FIXME: use the continuation here, too  -- "it%I%X"},
   
   , decoder [ARM_EXT_V6]   0xb660 0xfff8 (CPSIE  <$> bool 2 <*> bool 1 <*> bool 0 <*> pure Nothing) -- "cpsie\t%2'a%1'i%0'f%X"},
   , decoder [ARM_EXT_V6]   0xb670 0xfff8 (CPSID  <$> bool 2 <*> bool 1 <*> bool 0 <*> pure Nothing) -- "cpsid\t%2'a%1'i%0'f%X"},
@@ -248,13 +252,14 @@ thumbDecoders =
   
   , decoder [ARM_EXT_V4T]  0xE000 0xF800 (B <$> ((`shiftL` 1) . integral 0 10)) -- FIXME: sign-extend -- "b%c.n\t%0-10B%x"},
   
-  , decoder [ARM_EXT_V1]   0x0000 0x000 (pure Undefined)
+  , decoder [ARM_EXT_V1]   0x0000 0x0000 (pure Undefined)
   ]
 
 
-thumbDecode :: Word16 -> ThumbContinuation (GeneralInstruction UAL)
+thumbDecode :: D (ThumbContinuation (GeneralInstruction UAL))
 thumbDecode i = fromMaybe (Done Undefined) . fmap (decode Thumb i) . find (decoderMatches Thumb i) $ thumbDecoders
 
-thumbDecodeDbg :: Word16 -> (ThumbContinuation (GeneralInstruction UAL), (Word16, Word16))
+thumbDecodeDbg :: D (ThumbContinuation (GeneralInstruction UAL), (Word16, Word16))
 thumbDecodeDbg i = case fromJust . find (decoderMatches Thumb i) $ thumbDecoders of
-                    GeneralDecoder a b c d -> (d i, (b, c))
+                     GeneralDecoder a b c d -> (d i, (b, c))
+                    

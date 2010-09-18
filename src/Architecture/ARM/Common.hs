@@ -1,6 +1,8 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses, GADTs, EmptyDataDecls, FlexibleContexts, FlexibleInstances, RankNTypes, StandaloneDeriving, UndecidableInstances #-}
 module Architecture.ARM.Common where
 
+import Prelude hiding (EQ)
+
 import Data.Bits
 import Data.Word hiding (Word)
 import Data.Int
@@ -43,10 +45,6 @@ data Condition = EQ | NE | CS | CC | MI | PL | VS | VC
                | HI | LS | GE | LT | GT | LE | AL | UND
   deriving (Show, Read, Eq, Enum)
 
-data ITSpecifier = Nil | T | E | TT | ET | TE | EE | TTT 
-                 | ETT | TET | EET | TTE | ETE | TEE | EEE
-  deriving (Show, Read, Eq, Enum)
-
 data StatusRegister = CPSR | SPSR
   deriving (Show, Read, Eq, Ord, Enum)
 
@@ -59,7 +57,7 @@ data Nybble = High | Low
 data Width = Byte | Halfword | Word | Doubleword
   deriving (Show, Read, Eq, Enum)
 
-data Hint = SY | UN | ST | UNST | UK Word32 -- FIXME: should really prefix these consistently
+data Hint = SY | ST | ISH | ISHST | OSH | OSHST | NSH | NSHST | InvalidHint Word8
   deriving (Show, Read, Eq)
 
 data Direction = Decrement | Increment
@@ -70,10 +68,11 @@ data Order = Before | After
 
 -- data Mode = ARM | Thumb | Jazelle | ThumbEE
 
+negateCondition :: Condition -> Condition
+negateCondition = toEnum . (xor 1) . fromEnum
 
 data Conditional
 data Unconditional
-
 
 data GeneralInstruction a where
   Undefined     :: GeneralInstruction a
@@ -81,6 +80,28 @@ data GeneralInstruction a where
   Conditional   :: Condition -> Instruction a Conditional -> GeneralInstruction a
 
 deriving instance (Show (Instruction a Conditional), Show (Instruction a Unconditional)) => Show (GeneralInstruction a)
+
+data Z = Z
+newtype S n = S n
+
+data Specifier :: * -> * where
+  Empty :: Specifier (S n)
+  Then  :: Specifier n -> Specifier (S n)
+  Else  :: Specifier n -> Specifier (S n)
+
+deriving instance Show (Specifier n)
+
+type ITSpecifier = Specifier (S (S (S (S Z))))
+
+foldS :: a -> (a -> a) -> (a -> a) -> Specifier n -> a
+foldS z t e Empty = z
+foldS z t e (Then s) = t (foldS z t e s)
+foldS z t e (Else s) = e (foldS z t e s)
+
+itList :: Condition -> Specifier n -> [Condition]
+itList c = reverse . foldS [c] (c:) (negateCondition c:)
+
+
 
 generalInstruction :: r -> (Instruction a Unconditional -> r) -> (Condition -> Instruction a Conditional -> r) -> GeneralInstruction a -> r
 generalInstruction ud _ _ Undefined = ud

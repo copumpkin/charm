@@ -331,7 +331,7 @@ instance InstructionSet UAL where
     CBNZ   :: Register -> Word32 -> Instruction UAL Unconditional
     CBZ    :: Register -> Word32 -> Instruction UAL Unconditional
 
-    IT     :: ITSpecifier -> Instruction UAL Unconditional
+    IT     :: ITSpecifier -> Condition -> Instruction UAL Unconditional
 
     SDIV   :: Register -> Register -> Register -> Instruction UAL Unconditional
     UDIV   :: Register -> Register -> Register -> Instruction UAL Unconditional
@@ -446,5 +446,19 @@ srs Increment Before = SRSIB
 
 swp = cond SWP SWPB
 
+smla_nn Low  Low  = SMLABB
+smla_nn Low  High = SMLABT
+smla_nn High Low  = SMLATB
+smla_nn High High = SMLATT
+
+smlal_nn Low  Low  = SMLALBB
+smlal_nn Low  High = SMLALBT
+smlal_nn High Low  = SMLALTB
+smlal_nn High High = SMLALTT
+
+smul_nn Low  Low  = SMULBB
+smul_nn Low  High = SMULBT
+smul_nn High Low  = SMULTB
+smul_nn High High = SMULTT
 
 b = cond B BL

@@ -1,36 +1,126 @@
-{-# LANGUAGE TypeFamilies, GADTs #-}
+{-# LANGUAGE TypeFamilies, GADTs, EmptyDataDecls #-}
 module Architecture.ARM.Instructions.NEON where
+
+import Prelude hiding (Integral, Floating)
 
 import Architecture.ARM.Common
 
+import Data.Word hiding (Word)
+import Data.Int
+
 data NEON = NEON
 
+-- Yeah yeah, I know haskell isn't agda :( Horribly overengineered, but whatever
+
+data Quadword
+data Doubleword
+data Singleword
+data Halfword
+data Byte
+
+data Signed
+data Unsigned
+
+data Integral
+data Floating
+
+data Type :: * -> * -> * -> * where 
+  S8  :: Type Signed   Integral Byte
+  S16 :: Type Signed   Integral Halfword
+  S32 :: Type Signed   Integral Singleword
+  U8  :: Type Unsigned Integral Byte
+  U16 :: Type Unsigned Integral Halfword
+  U32 :: Type Unsigned Integral Singleword
+  F32 :: Type Signed   Floating Singleword
+  F64 :: Type Signed   Floating Doubleword
+
+type family Repr s t w
+type instance Repr Signed Integral Byte = Int8
+type instance Repr Signed Integral Halfword = Int16
+type instance Repr Signed Integral Singleword = Int32
+type instance Repr Unsigned Integral Byte = Word8
+type instance Repr Unsigned Integral Halfword = Word16
+type instance Repr Unsigned Integral Singleword = Word32
+type instance Repr Signed Floating Singleword = Float
+type instance Repr Signed Floating Doubleword = Double
+
+
+data VectorRegister :: * -> * where
+  Q0  :: VectorRegister Quadword
+  Q1  :: VectorRegister Quadword
+  Q2  :: VectorRegister Quadword
+  Q3  :: VectorRegister Quadword
+  Q4  :: VectorRegister Quadword
+  Q5  :: VectorRegister Quadword
+  Q6  :: VectorRegister Quadword
+  Q7  :: VectorRegister Quadword
+  Q8  :: VectorRegister Quadword
+  Q9  :: VectorRegister Quadword
+  Q10 :: VectorRegister Quadword
+  Q11 :: VectorRegister Quadword
+  Q12 :: VectorRegister Quadword
+  Q13 :: VectorRegister Quadword
+  Q14 :: VectorRegister Quadword
+  Q15 :: VectorRegister Quadword
+
+  D0  :: VectorRegister Doubleword
+  D1  :: VectorRegister Doubleword
+  D2  :: VectorRegister Doubleword
+  D3  :: VectorRegister Doubleword
+  D4  :: VectorRegister Doubleword
+  D5  :: VectorRegister Doubleword
+  D6  :: VectorRegister Doubleword
+  D7  :: VectorRegister Doubleword
+  D8  :: VectorRegister Doubleword
+  D9  :: VectorRegister Doubleword
+  D10 :: VectorRegister Doubleword
+  D11 :: VectorRegister Doubleword
+  D12 :: VectorRegister Doubleword
+  D13 :: VectorRegister Doubleword
+  D14 :: VectorRegister Doubleword
+  D15 :: VectorRegister Doubleword
+  D16 :: VectorRegister Doubleword
+  D17 :: VectorRegister Doubleword
+  D18 :: VectorRegister Doubleword
+  D19 :: VectorRegister Doubleword
+  D20 :: VectorRegister Doubleword
+  D21 :: VectorRegister Doubleword
+  D22 :: VectorRegister Doubleword
+  D23 :: VectorRegister Doubleword
+  D24 :: VectorRegister Doubleword
+  D25 :: VectorRegister Doubleword
+  D26 :: VectorRegister Doubleword
+  D27 :: VectorRegister Doubleword
+  D28 :: VectorRegister Doubleword
+  D29 :: VectorRegister Doubleword
+  D30 :: VectorRegister Doubleword
+  D31 :: VectorRegister Doubleword
 
 instance InstructionSet NEON where
   data Instruction NEON c where
-    VABA     :: Instruction NEON Conditional
-    VABAL    :: Instruction NEON Conditional
-    VABD     :: Instruction NEON Conditional
-    VABDL    :: Instruction NEON Conditional
-    VABS     :: Instruction NEON Conditional
-    VACGE    :: Instruction NEON Conditional
-    VACGT    :: Instruction NEON Conditional
-    VADD     :: Instruction NEON Conditional
-    VADDHN   :: Instruction NEON Conditional
-    VADDL    :: Instruction NEON Conditional
-    VADDW    :: Instruction NEON Conditional
-    VAND     :: Instruction NEON Conditional
-    VBIC     :: Instruction NEON Conditional
-    VBIF     :: Instruction NEON Conditional
-    VBIT     :: Instruction NEON Conditional
-    VBSL     :: Instruction NEON Conditional
-    VCEQ     :: Instruction NEON Conditional
-    VCGE     :: Instruction NEON Conditional
-    VCGT     :: Instruction NEON Conditional
-    VCLE     :: Instruction NEON Conditional
-    VCLS     :: Instruction NEON Conditional
-    VCLT     :: Instruction NEON Conditional
-    VCLZ     :: Instruction NEON Conditional
+    VABA     :: Type s t w -> VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VABAL    :: Type s t w -> VectorRegister Quadword -> VectorRegister Doubleword -> VectorRegister Doubleword -> Instruction NEON Conditional
+    VABD     :: Type s t w -> VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VABDL    :: Type s t w -> VectorRegister Quadword -> VectorRegister Doubleword -> VectorRegister Doubleword -> Instruction NEON Conditional
+    VABS     :: Type s t w -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VACGE    :: VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VACGT    :: VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VADD     :: Type s t w -> VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VADDHN   :: Type s t w -> VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VADDL    :: Type s t w -> VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VADDW    :: Type s t w -> VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VAND     :: VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VBIC     :: Type s t w -> VectorRegister q -> VectorRegister q -> Either (VectorRegister q) (Repr s t w) -> Instruction NEON Conditional
+    VBIF     :: VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VBIT     :: VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VBSL     :: VectorRegister q -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VCEQ     :: Type s t w -> VectorRegister q -> VectorRegister q -> Maybe (VectorRegister q) -> Instruction NEON Conditional
+    VCGE     :: Type s t w -> VectorRegister q -> VectorRegister q -> Maybe (VectorRegister q) -> Instruction NEON Conditional
+    VCGT     :: Type s t w -> VectorRegister q -> VectorRegister q -> Maybe (VectorRegister q) -> Instruction NEON Conditional
+    VCLE     :: Type s t w -> VectorRegister q -> VectorRegister q -> Maybe (VectorRegister q) -> Instruction NEON Conditional
+    VCLS     :: Type s t w -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
+    VCLT     :: Type s t w -> VectorRegister q -> VectorRegister q -> Maybe (VectorRegister q) -> Instruction NEON Conditional
+    VCLZ     :: Type s t w -> VectorRegister q -> VectorRegister q -> Instruction NEON Conditional
     VCNT     :: Instruction NEON Conditional
     VCVT     :: Instruction NEON Conditional
     VDUP     :: Instruction NEON Conditional

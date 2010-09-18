@@ -6,6 +6,8 @@ import Prelude hiding (and)
 import Architecture.ARM.Common
 import Architecture.ARM.Instructions.UAL
 
+import qualified Architecture.ARM.Decoder.Common as C
+
 import Data.Maybe
 import Data.List hiding (and)
 import Data.Int
@@ -146,12 +148,7 @@ arm_C i = '_' : (if i .&. 0x80000 /= 0 then "f" else "" ++
                  if i .&. 0x10000 /= 0 then "c" else "")
 
 arm_U :: D Hint
-arm_U i = case i .&. 0xf of
-            0xf -> SY
-            0x7 -> UN
-            0xe -> ST
-            0x6 -> UNST
-            x   -> UK x
+arm_U = C.hint
 
 arm_P :: D MemOp
 arm_P i = armDecodeAddress $ i .|. (1 `shiftL` 24)
