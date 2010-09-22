@@ -89,13 +89,20 @@ address :: D MemOp
 address = error "thumb32 `address` not implemented"
 
 width :: D Width
-width = error "thumb32 `width` not implemented"
+width = toEnum <$> integral 21 22
 
 statusReg :: D StatusRegister
 statusReg = error "thumb32 `statusReg` not implemented"
 
 branch :: D Int32
-branch = error "thumb32 `branch` not implemented"
+branch =
+  do j1  <- integral 11 11
+     j2  <- integral 13 13 
+     s   <- integral 26 26
+     let i1 = complement (j1 `xor` s)
+         i2 = complement (j2 `xor` s)
+     imm <- multiIntegral [(1, 10),(16, 25)]
+     return $ (s `shiftL` 22 .|. i1 `shiftL` 21 .|. i2 `shiftL` 20 .|. imm) `shiftL` 2
 
 thumb32Decoders :: [GeneralDecoder Thumb32 (GeneralInstruction UAL)]
 thumb32Decoders =
@@ -128,7 +135,7 @@ thumb32Decoders =
   , decoder [ARM_EXT_V6T2] 0xf3af8500 0xffffff00 (CPSIE    <$> bool 7 <*> bool 6 <*> bool 5 <*> (Just <$> integral 0 4)) -- "cpsie\t%7'a%6'i%5'f, #%0-4d%X"},
   , decoder [ARM_EXT_V6T2] 0xf3af8700 0xffffff00 (CPSID    <$> bool 7 <*> bool 6 <*> bool 5 <*> (Just <$> integral 0 4)) -- "cpsid\t%7'a%6'i%5'f, #%0-4d%X"},
   , decoder [ARM_EXT_V6T2] 0xf3de8f00 0xffffff00 (SUBS PC LR <$> (Imm <$> integral 0 7)) -- "subs%c\tpc, lr, #%0-7d"},
-  , decoder [ARM_EXT_V6T2] 0xf3808000 0xffe0f000 (MSR      <$> undefined <*> undefined <*> dataReg 16) -- "msr%c\t%C, %16-19r"},
+  , decoder [ARM_EXT_V6T2] 0xf3808000 0xffe0f000 (MSR      <$> bool 10 <*> bool 11 <*> dataReg 16) -- "msr%c\t%C, %16-19r"},
   , decoder [ARM_EXT_V6T2] 0xe8500f00 0xfff00fff (LDREX    <$> reg 12 <*> memReg 16) -- "ldrex%c\t%12-15r, [%16-19r]"},
   , decoder [ARM_EXT_V6T2] 0xe8d00f4f 0xfff00fef (choose 4 LDREXH LDREXB <*> reg 12 <*> memReg 16) -- "ldrex%4?hb%c\t%12-15r, [%16-19r]"},
   , decoder [ARM_EXT_V6T2] 0xe800c000 0xffd0ffe0 (SRSDB    <$> bool 21 <*> reg 16 <*> integral 0 4) -- "srsdb%c\t%16-19r%21'!, #%0-4d"},
@@ -247,7 +254,7 @@ thumb32Decoders =
   , decoder [ARM_EXT_V6T2] 0xfb100000 0xfff000c0 (smla_nn  <$> nybble 5 <*> nybble 4 <*> reg 8 <*> reg 16 <*> reg 0 <*> reg 12) -- "smla%5?tb%4?tb%c\t%8-11r, %16-19r, %0-3r, %12-15r"},
   , decoder [ARM_EXT_V6T2] 0xfbc00080 0xfff000c0 (smlal_nn <$> nybble 5 <*> nybble 4 <*> reg 12 <*> reg 8 <*> reg 16 <*> reg 0) -- "smlal%5?tb%4?tb%c\t%12-15r, %8-11r, %16-19r, %0-3r"},
   , decoder [ARM_EXT_V6T2] 0xf3600000 0xfff08020 (BFI      <$> reg 8 <*> reg 16 <*> undefined) -- "bfi%c\t%8-11r, %16-19r, %E"},
-  , decoder [ARM_EXT_V6T2] 0xf8100e00 0xfe900f00 (ldr      <$> width <*> pure True <*> pure False <*> reg 12 <*> address) -- "ldr%wt%c\t%12-15r, %a"},
+  , decoder [ARM_EXT_V6T2] 0xf8100e00 0xfe900f00 (ldr      <$> width <*> pure True <*> bool 24 <*> reg 12 <*> address) -- "ldr%wt%c\t%12-15r, %a"},
   , decoder [ARM_EXT_V6T2] 0xf3000000 0xffd08020 (SSAT     <$> reg 8 <*> integral 0 4 <*> dataReg 16) -- "ssat%c\t%8-11r, #%0-4d, %16-19r%s"},
   , decoder [ARM_EXT_V6T2] 0xf3800000 0xffd08020 (USAT     <$> reg 8 <*> integral 0 4 <*> dataReg 16) -- "usat%c\t%8-11r, #%0-4d, %16-19r%s"},
   , decoder [ARM_EXT_V6T2] 0xf2000000 0xfbf08000 (ADD      <$> reg 8 <*> reg 16 <*> (Imm <$> multiIntegral [(0, 7), (12, 14), (26, 26)])) -- "addw%c\t%8-11r, %16-19r, %I"},
@@ -286,7 +293,7 @@ thumb32Decoders =
   , decoder [ARM_EXT_V6T2] 0xe8600000 0xff700000 (STRD     <$> reg 12 <*> reg 8 <*> undefined) -- "strd%c\t%12-15r, %8-11r, [%16-19r], #%23`-%0-7W"},
   , decoder [ARM_EXT_V6T2] 0xe8700000 0xff700000 (LDRD     <$> reg 12 <*> reg 8 <*> undefined) -- "ldrd%c\t%12-15r, %8-11r, [%16-19r], #%23`-%0-7W"},
   , decoder [ARM_EXT_V6T2] 0xf8000000 0xff100000 (str      <$> width <*> pure False <*> reg 12 <*> address) -- "str%w%c.w\t%12-15r, %a"},
-  , decoder [ARM_EXT_V6T2] 0xf8100000 0xfe100000 (ldr      <$> width <*> pure False <*> pure False <*> reg 12 <*> address) -- "ldr%w%c.w\t%12-15r, %a"},
+  , decoder [ARM_EXT_V6T2] 0xf8100000 0xfe100000 (ldr      <$> width <*> pure False <*> bool 24 <*> reg 12 <*> address) -- "ldr%w%c.w\t%12-15r, %a"},
 
   , decoder [ARM_EXT_V6T2] 0xf3c08000 0xfbc0d000 (pure Undefined) -- "(pure Undefined) (bcc, cond=0xF)"},
   , decoder [ARM_EXT_V6T2] 0xf3808000 0xfbc0d000 (pure Undefined) -- "(pure Undefined) (bcc, cond=0xE)"},
