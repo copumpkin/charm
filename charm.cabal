@@ -34,8 +34,9 @@ Library
   -- Packages needed in order to build this package.
   Build-depends:       base       == 4.*,
                        pretty     == 1.0.*,
-                       fclabels   == 0.9.*,
-                       containers == 0.3.*
+                       fclabels   == 0.11.*,
+                       containers == 0.4.*,
+                       she        == 0.3.*
                        
   
   -- Modules not exported by this package.
