@@ -172,7 +172,7 @@ arm_E i = let msb = (i .&. 0x1f0000) `shiftR` 16
               else Nothing --"(invalid " ++ (show lsb) ++ ":" ++ (show msb) ++ ")"            
 
 arm_V :: D Word32
-arm_V = (| ((`shiftL` 12) <$> integral 16 19) .|. integral 0 11 |)
+arm_V = (| (| (`shiftL` 12) (integral 16 19) |) .|. integral 0 11 |)
 
 bit b i = bitRange b b i
 
@@ -202,6 +202,11 @@ reg12_reg16_reg0_reg8 f = reg12_reg16_reg0 f <*> reg 8
 reg16_reg0_reg8 f = (| f (reg 16) (reg 0) (reg 8) |)
 reg16_reg0_reg8_reg12 f = reg16_reg0_reg8 f <*> reg 12
 bool20_reg12_reg16_o f = (| f (bool 20) (reg 12) (reg 16) arm_o |)
+
+ldrexd' rt = LDREXD rt (succ rt)
+strexd' rd rt = STREXD rd rt (succ rt)
+
+-- (do rd <- reg 12; rn <- reg 16; rt <- reg 0; return (STREXD rd rt (succ rt) (MemReg rn (Imm 0) False)))
 
 armDecoders :: [GeneralDecoder ARM (GeneralInstruction UAL)]
 armDecoders = 
@@ -235,12 +240,13 @@ armDecoders =
   , decoder [ARM_EXT_V6Z]   0x01600070 0x0ff000f0 (| SMC arm_e |)
 
   , decoder [ARM_EXT_V6K]   0xf57ff01f 0xffffffff (| CLREX |) 
-  , decoder [ARM_EXT_V6K]   0x01d00f9f 0x0ff00fff (| LDREXB (reg 12) (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
-  , decoder [ARM_EXT_V6K]   0x01b00f9f 0x0ff00fff (do rt <- reg 12; rn <- reg 16; return (LDREXD rt (succ rt) (MemReg rn (Imm 0) False))) -- Doesn't really need to be this compliated. We could just have the second argument be implicit (but that makes things a little uglier to work with later)
-  , decoder [ARM_EXT_V6K]   0x01f00f9f 0x0ff00fff (| LDREXH (reg 12) (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
-  , decoder [ARM_EXT_V6K]   0x01c00f90 0x0ff00ff0 (| STREXB (reg 12) (reg 0) (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
-  , decoder [ARM_EXT_V6K]   0x01a00f90 0x0ff00ff0 (do rd <- reg 12; rn <- reg 16; rt <- reg 0; return (STREXD rd rt (succ rt) (MemReg rn (Imm 0) False))) -- As above
-  , decoder [ARM_EXT_V6K]   0x01e00f90 0x0ff00ff0 (| STREXH (reg 12) (reg 0) (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
+  
+  , decoder [ARM_EXT_V6K]   0x01d00f9f 0x0ff00fff (| LDREXB  (reg 12)         (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
+  , decoder [ARM_EXT_V6K]   0x01b00f9f 0x0ff00fff (| ldrexd' (reg 12)         (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
+  , decoder [ARM_EXT_V6K]   0x01f00f9f 0x0ff00fff (| LDREXH  (reg 12)         (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
+  , decoder [ARM_EXT_V6K]   0x01c00f90 0x0ff00ff0 (| STREXB  (reg 12) (reg 0) (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
+  , decoder [ARM_EXT_V6K]   0x01a00f90 0x0ff00ff0 (| strexd' (reg 12) (reg 0) (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
+  , decoder [ARM_EXT_V6K]   0x01e00f90 0x0ff00ff0 (| STREXH  (reg 12) (reg 0) (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
 
   , decoder [ARM_EXT_V6K]   0x0320f001 0x0fffffff (| YIELD |)
   , decoder [ARM_EXT_V6K]   0x0320f002 0x0fffffff (| WFE |)
