@@ -209,8 +209,8 @@ armDecoders =
   , decoder [ARM_EXT_V2]    0x00000090 0x0fe000f0 (| mul (bool 20) (reg 16) (reg 0) (reg 8) |)
   , decoder [ARM_EXT_V2]    0x00200090 0x0fe000f0 (| mla (bool 20) (reg 16) (reg 0) (reg 8) (reg 12) |)
   , decoder [ARM_EXT_V2S]   0x01000090 0x0fb00ff0 (| swp (bool 22) (reg 12) (reg 0) (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
-  , decoder [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (choose 22 umull smull <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
-  , decoder [ARM_EXT_V3M]   0x00a00090 0x0fa000f0 (choose 22 umlal smlal <*> bool 20 <*> reg 12 <*> reg 16 <*> reg 0 <*> reg 8)
+  , decoder [ARM_EXT_V3M]   0x00800090 0x0fa000f0 (| id (choose 22 umull smull) (bool 20) (reg 12) (reg 16) (reg 0) (reg 8) |)
+  , decoder [ARM_EXT_V3M]   0x00a00090 0x0fa000f0 (| id (choose 22 umlal smlal) (bool 20) (reg 12) (reg 16) (reg 0) (reg 8) |)
 
   , decoder [ARM_EXT_V7]    0xf450f000 0xfd70f000 (| PLI arm_P |)
   , decoder [ARM_EXT_V7]    0x0320f0f0 0x0ffffff0 (| DBG (integral 0 3) |)
@@ -230,7 +230,7 @@ armDecoders =
   , decoder [ARM_EXT_V6T2]  0x03000000 0x0ff00000 (| MOVW (reg 12) arm_V |)
   , decoder [ARM_EXT_V6T2]  0x03400000 0x0ff00000 (| MOVT (reg 12) arm_V |)
   , decoder [ARM_EXT_V6T2]  0x06ff0f30 0x0fff0ff0 (| RBIT (reg 12) (reg 0) |)
-  , decoder [ARM_EXT_V6T2]  0x07a00050 0x0fa00070 (choose 22 SBFX UBFX <*> reg 12 <*> reg 0 <*> integral 7 11 <*> integral' 16 20)
+  , decoder [ARM_EXT_V6T2]  0x07a00050 0x0fa00070 (| id (choose 22 SBFX UBFX) (reg 12) (reg 0) (integral 7 11) (integral' 16 20) |)
 
   , decoder [ARM_EXT_V6Z]   0x01600070 0x0ff000f0 (| SMC arm_e |)
 
@@ -255,9 +255,9 @@ armDecoders =
   , decoder [ARM_EXT_V6]    0xf1000000 0xfff1fe20 (| CPS   (integral 0 4) |)
 
   , decoder [ARM_EXT_V6]    0x06800010 0x0ff00ff0 (| PKHBT (reg 12) (reg 16) (| Reg (reg 0) |) |)
-  , decoder [ARM_EXT_V6]    0x06800010 0x0ff00070 (| PKHBT (reg 12) (reg 16) (| (RegShiftImm S_LSL) (integral 7 11) (reg 0) |) |)
-  , decoder [ARM_EXT_V6]    0x06800050 0x0ff00ff0 (| PKHTB (reg 12) (reg 16) (| (RegShiftImm S_ASR 32) (reg 0) |) |)
-  , decoder [ARM_EXT_V6]    0x06800050 0x0ff00070 (| PKHTB (reg 12) (reg 16) (| (RegShiftImm S_ASR)  (integral 7 11) (reg 0) |) |)
+  , decoder [ARM_EXT_V6]    0x06800010 0x0ff00070 (| PKHBT (reg 12) (reg 16) (| RegShiftImm ~ S_LSL (integral 7 11) (reg 0) |) |)
+  , decoder [ARM_EXT_V6]    0x06800050 0x0ff00ff0 (| PKHTB (reg 12) (reg 16) (| RegShiftImm ~ S_ASR ~ 32 (reg 0) |) |)
+  , decoder [ARM_EXT_V6]    0x06800050 0x0ff00070 (| PKHTB (reg 12) (reg 16) (| RegShiftImm ~ S_ASR (integral 7 11) (reg 0) |) |)
   , decoder [ARM_EXT_V6]    0x01900f9f 0x0ff00fff (| LDREX (reg 12) (| MemReg (reg 16) ~ (Imm 0) ~ False |) |)
   , decoder [ARM_EXT_V6]    0x06200f10 0x0ff00ff0 (  QADD16  $< reg12_reg16_reg0) 
   , decoder [ARM_EXT_V6]    0x06200f90 0x0ff00ff0 (  QADD8   $< reg12_reg16_reg0) 
