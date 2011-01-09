@@ -1,5 +1,6 @@
-{-# Language PackageImports, MultiParamTypeClasses, TypeFamilies, FlexibleInstances, FlexibleContexts, ImplicitParams, TypeSynonymInstances #-}
-module Architecture.ARM.Decoder.Thumb (Thumb, thumbDecode, thumbDecodeDbg, ThumbContinuation(..)) where
+{-# Language PackageImports, MultiParamTypeClasses, TypeFamilies, FlexibleInstances, FlexibleContexts, ImplicitParams, TypeSynonymInstances, TupleSections #-}
+
+module Architecture.ARM.Decoder.Thumb (Thumb, {-thumbDecode, thumbDecodeDbg, ThumbContinuation(..)-}) where
 
 import Prelude hiding (and)
 
@@ -23,6 +24,7 @@ import Architecture.ARM.Decoder.Iteratee
 
 data Thumb = Thumb
 type instance Word Thumb = Word16
+
 
 -- Basically an iteratee, or the free monad of (Word16 ->)
 type ThumbContinuation = Iteratee Word16
@@ -132,7 +134,7 @@ catWord16 :: Word16 -> Word16 -> Word32
 catWord16 x y = (fromIntegral x `shiftL` 16) .|. (fromIntegral y)
 
 thumb32 :: D (ThumbContinuation (GeneralInstruction UAL))
-thumb32 x = More (Done . thumb32Decode . catWord16 x)
+thumb32 x = More ((, Nothing) . Done . thumb32Decode . catWord16 x)
 
 it :: D (ThumbContinuation [GeneralInstruction UAL])
 it = fromIteratee $
@@ -262,4 +264,3 @@ thumbDecode i = fromMaybe (Done Undefined) . fmap (decode Thumb i) . find (decod
 thumbDecodeDbg :: D (ThumbContinuation (GeneralInstruction UAL), (Word16, Word16))
 thumbDecodeDbg i = case fromJust . find (decoderMatches Thumb i) $ thumbDecoders of
                      GeneralDecoder a b c d -> (d i, (b, c))
-                    
