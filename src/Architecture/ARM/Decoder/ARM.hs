@@ -141,13 +141,6 @@ arm_B = do x <- choose 23 0 0xff000000 -- negative bit
            z <- choose 24 0 2 -- 2
            return (fromIntegral (offset + 8 + z)) -- FIXME: Do I want that +8 in there? Or should I deal with it later. Probably later, but will leave it in for now.
 
--- FIXME: this is ugly
-arm_C :: D String
-arm_C i = '_' : (if i .&. 0x80000 /= 0 then "f" else "" ++ 
-                 if i .&. 0x40000 /= 0 then "s" else "" ++
-                 if i .&. 0x20000 /= 0 then "x" else "" ++
-                 if i .&. 0x10000 /= 0 then "c" else "")
-
 arm_U :: D Hint
 arm_U = C.hint
 
